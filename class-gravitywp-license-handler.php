@@ -1,6 +1,12 @@
 <?php
+namespace GravityWP\GravityWP_Advanced_Merge_Tags;
 
+use GFCommon;
 use Gravity_Forms\Gravity_Forms\Messages;
+use Appsero;
+
+
+defined( 'ABSPATH' ) || die();
 
 /**
  * Handles GWP Licenses.
@@ -92,17 +98,17 @@ class GravityWP_License_Handler {
 	}
 
 	/**
-	 * Define plugin settings fields.
+	 * Display an admin notice.
 	 *
 	 * @since  1.0
 	 *
-	 * @return array
+	 * @return void
 	 */
 	public function action_admin_notices() {
 		$primary_button_link = admin_url( 'admin.php?page=gf_settings&subview=' . $this->_addon_slug );
 		$url                 = 'https://gravitywp.com/?utm_source=admin_notice&utm_medium=admin&utm_content=inactive&utm_campaign=Admin%20Notice';
 
-		$message = esc_html__( 'Your %1$s license has not been actived. This means you are missing out on security fixes, updates and support.%2$sActivate your license%3$s or %4$sget a license here%5$s', 'gravitywp-list-field-number-format' );
+		$message = esc_html__( 'Your %1$s license has not been actived. This means you are missing out on security fixes, updates and support.%2$sActivate your license%3$s or %4$sget a license here%5$s', 'gravitywp-license-handler' );
 		$message = sprintf( $message, $this->_addon_title, '<br /><br /><a href="' . esc_url( $primary_button_link ) . '" class="button button-primary">', '</a>', '<a href="' . esc_url( $url ) . '" class="button button-secondary">', '</a>' );
 
 		$key = $this->_addon_slug . '_license_notice_' . gmdate( 'Y' ) . gmdate( 'z' );
@@ -118,7 +124,7 @@ class GravityWP_License_Handler {
 
 		GFCommon::display_dismissible_message( $notices );
 	}
-	
+
 	/**
 	 * Define plugin settings fields.
 	 *
