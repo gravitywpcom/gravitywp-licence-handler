@@ -3,6 +3,6 @@
     "description": "Handles Appsero licenses for Gravity Forms Addons",
     "require": {
         "php": ">=7.4",
-        "another-vendor/package": "appsero/client"
+        "appsero/client": "1.2.0"
     }
 }
