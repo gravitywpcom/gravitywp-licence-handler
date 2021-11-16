@@ -11,7 +11,7 @@ defined( 'ABSPATH' ) || die();
 /**
  * Handles GWP Licenses.
  *
- * @version 1.0
+ * @version 1.0.8
  */
 class LicenseHandler {
 
