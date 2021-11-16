@@ -1,5 +1,5 @@
 <?php
-namespace GravityWP\GravityWP_Advanced_Merge_Tags;
+namespace GravityWP\LicenseHandler;
 
 use GFCommon;
 use Gravity_Forms\Gravity_Forms\Messages;
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || die();
  *
  * @version 1.0
  */
-class GravityWP_License_Handler {
+class LicenseHandler {
 
 	/**
 	 * Store the initialized app_sero client
