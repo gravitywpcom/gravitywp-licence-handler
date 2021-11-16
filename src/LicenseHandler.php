@@ -1,5 +1,5 @@
 <?php
-namespace GravityWP;
+namespace GravityWP\LicenseHandler;
 
 use GFCommon;
 use Gravity_Forms\Gravity_Forms\Messages;
