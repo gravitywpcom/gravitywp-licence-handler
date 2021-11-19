@@ -11,7 +11,7 @@ defined( 'ABSPATH' ) || die();
 /**
  * Handles GWP Licenses.
  *
- * @version 1.0.10
+ * @version 1.0.11
  */
 class LicenseHandler {
 
@@ -105,7 +105,7 @@ class LicenseHandler {
 	 * @return void
 	 */
 	public function action_admin_notices() {
-		$site_slug = $this->_addon_class->gwp_site_slug;
+		$site_slug = $this->_addon_class::get_instance()->gwp_site_slug;
 		$primary_button_link = admin_url( 'admin.php?page=gf_settings&subview=' . $this->_addon_slug );
 		if ( ! empty( $site_slug ) ) {
 			$url = "https://gravitywp.com/add-on/{$site_slug}/?utm_source=admin_notice&utm_medium=admin&utm_content=inactive&utm_campaign=Admin%20Notice";
