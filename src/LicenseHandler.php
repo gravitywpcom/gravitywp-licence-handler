@@ -11,7 +11,7 @@ defined( 'ABSPATH' ) || die();
 /**
  * Handles GWP Licenses.
  *
- * @version 1.0.8
+ * @version 1.0.10
  */
 class LicenseHandler {
 
@@ -105,8 +105,13 @@ class LicenseHandler {
 	 * @return void
 	 */
 	public function action_admin_notices() {
+		$site_slug = $this->_addon_class->gwp_site_slug;
 		$primary_button_link = admin_url( 'admin.php?page=gf_settings&subview=' . $this->_addon_slug );
-		$url                 = 'https://gravitywp.com/?utm_source=admin_notice&utm_medium=admin&utm_content=inactive&utm_campaign=Admin%20Notice';
+		if ( ! empty( $site_slug ) ) {
+			$url = "https://gravitywp.com/add-on/{site_slug}/?utm_source=admin_notice&utm_medium=admin&utm_content=inactive&utm_campaign=Admin%20Notice";
+		} else {
+			$url = 'https://gravitywp.com/add-ons/?utm_source=admin_notice&utm_medium=admin&utm_content=inactive&utm_campaign=Admin%20Notice';
+		}
 
 		$message = esc_html__( 'Your %1$s license has not been actived. This means you are missing out on security fixes, updates and support.%2$sActivate your license%3$s or %4$sget a license here%5$s', 'gravitywp-license-handler' );
 		$message = sprintf( $message, $this->_addon_title, '<br /><br /><a href="' . esc_url( $primary_button_link ) . '" class="button button-primary">', '</a>', '<a href="' . esc_url( $url ) . '" class="button button-secondary">', '</a>' );
