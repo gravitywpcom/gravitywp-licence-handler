@@ -108,7 +108,7 @@ class LicenseHandler {
 		$site_slug = $this->_addon_class->gwp_site_slug;
 		$primary_button_link = admin_url( 'admin.php?page=gf_settings&subview=' . $this->_addon_slug );
 		if ( ! empty( $site_slug ) ) {
-			$url = "https://gravitywp.com/add-on/{site_slug}/?utm_source=admin_notice&utm_medium=admin&utm_content=inactive&utm_campaign=Admin%20Notice";
+			$url = "https://gravitywp.com/add-on/{$site_slug}/?utm_source=admin_notice&utm_medium=admin&utm_content=inactive&utm_campaign=Admin%20Notice";
 		} else {
 			$url = 'https://gravitywp.com/add-ons/?utm_source=admin_notice&utm_medium=admin&utm_content=inactive&utm_campaign=Admin%20Notice';
 		}
