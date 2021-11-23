@@ -11,7 +11,7 @@ defined( 'ABSPATH' ) || die();
 /**
  * Handles GWP Licenses.
  *
- * @version 1.0.11
+ * @version 1.0.12
  */
 class LicenseHandler {
 
@@ -142,8 +142,8 @@ class LicenseHandler {
 
 		$license_field = array(
 			'name'                => $this->_addon_slug . '_license_key',
-			'tooltip'             => esc_html__( 'Enter the license key you received after purchasing the plugin.', 'gravitywp-list-field-number-format' ),
-			'label'               => esc_html__( 'License Key', 'gravitywp-list-field-number-format' ),
+			'tooltip'             => esc_html__( 'Enter the license key you received after purchasing the plugin.', 'gravitywp-license-handler' ),
+			'label'               => esc_html__( 'License Key', 'gravitywp-license-handler' ),
 			'type'                => 'text',
 			'input_type'          => 'password',
 			'class'               => 'medium',
@@ -151,11 +151,11 @@ class LicenseHandler {
 			'required'            => true,
 			'validation_callback' => array( $this, 'license_validation' ),
 			'feedback_callback'   => array( $this, 'license_feedback' ),
-			'error_message'       => esc_html__( 'Invalid or expired license', 'gravitywp-list-field-number-format' ),
+			'error_message'       => esc_html__( 'Invalid or expired license', 'gravitywp-license-handler' ),
 		);
 
 		return array(
-			'title'  => esc_html__( 'To unlock plugin updates and support, please enter your license key below', 'gravitywp-list-field-number-format' ),
+			'title'  => esc_html__( 'To unlock plugin updates and support, please enter your license key below', 'gravitywp-license-handler' ),
 			'fields' => array( $license_field ),
 		);
 	}
