@@ -2,16 +2,13 @@
 namespace GravityWP\LicenseHandler;
 
 use GFCommon;
-use Gravity_Forms\Gravity_Forms\Messages;
-use Appsero;
-
 
 defined( 'ABSPATH' ) || die();
 
 /**
  * Handles GWP Licenses.
  *
- * @version 1.0.12
+ * @version 1.0.13
  */
 class LicenseHandler {
 
@@ -85,7 +82,7 @@ class LicenseHandler {
 		$this->_addon_license = $gwp_addon_class::get_instance()->get_plugin_setting( $this->_addon_slug . '_license_key' );
 		$this->_addon_title   = $gwp_addon_class::get_instance()->plugin_page_title();
 
-		$this->_appsero_client = new Appsero\Client( $license_hash, $this->_addon_title, __FILE__ );
+		$this->_appsero_client = new \Appsero\Client( $license_hash, $this->_addon_title, __FILE__ );
 
 		$this->_license_handler = $this->_appsero_client->license();
 
