@@ -8,7 +8,7 @@ defined( 'ABSPATH' ) || die();
 /**
  * Handles GWP Licenses.
  *
- * @version 1.0.13
+ * @version 1.0.14
  */
 class LicenseHandler {
 
@@ -124,7 +124,7 @@ class LicenseHandler {
 
 		$notices = array( $notice );
 
-		GFCommon::display_dismissible_message( $notices );
+		GFCommon::add_dismissible_message( $message, $key, 'warning', false, true );
 	}
 
 	/**
@@ -172,7 +172,12 @@ class LicenseHandler {
 			return null;
 		}
 
-		return $this->_license_handler->is_valid();
+		if ( $this->_license_handler->is_valid() ) {
+			GFCommon::remove_dismissible_message( $this->_addon_slug . '_license_notice_' . gmdate( 'Y' ) . gmdate( 'z' ) );
+			return true;
+		}
+
+		return false;
 	}
 
 
