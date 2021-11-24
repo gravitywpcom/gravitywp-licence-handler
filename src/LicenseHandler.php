@@ -113,7 +113,7 @@ class LicenseHandler {
 		$message = esc_html__( 'Your %1$s license has not been actived. This means you are missing out on security fixes, updates and support.%2$sActivate your license%3$s or %4$sget a license here%5$s', 'gravitywp-license-handler' );
 		$message = sprintf( $message, $this->_addon_title, '<br /><br /><a href="' . esc_url( $primary_button_link ) . '" class="button button-primary">', '</a>', '<a href="' . esc_url( $url ) . '" class="button button-secondary">', '</a>' );
 
-		$key = $this->_addon_slug . '_license_notice';
+		$key = $this->_addon_slug . '_license_notice_' . gmdate( 'Y' ) . gmdate( 'z' );
 
 		$notice = array(
 			'key'          => $key,
@@ -173,7 +173,7 @@ class LicenseHandler {
 		}
 
 		if ( $this->_license_handler->is_valid() ) {
-			GFCommon::remove_dismissible_message( $this->_addon_slug . '_license_notice' );
+			GFCommon::remove_dismissible_message( $this->_addon_slug . '_license_notice_' . gmdate( 'Y' ) . gmdate( 'z' ) );
 			return true;
 		}
 
