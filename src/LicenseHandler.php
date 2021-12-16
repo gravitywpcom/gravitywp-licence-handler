@@ -8,7 +8,7 @@ defined( 'ABSPATH' ) || die();
 /**
  * Handles GWP Licenses.
  *
- * @version 1.0.14
+ * @version 1.0.15
  */
 class LicenseHandler {
 
@@ -67,6 +67,15 @@ class LicenseHandler {
 	private $_addon_title = '';
 
 	/**
+	 * Store the GravityWP GF Addon path
+	 *
+	 * @since  1.0
+	 * @access private
+	 * @var    string $_addon_path the GravityWP GF Addon path.
+	 */
+	private $_addon_path = '';
+
+	/**
 	 * Constructor.
 	 *
 	 * @since  1.0
@@ -81,8 +90,9 @@ class LicenseHandler {
 		$this->_addon_slug    = $gwp_addon_class::get_instance()->get_slug();
 		$this->_addon_license = $gwp_addon_class::get_instance()->get_plugin_setting( $this->_addon_slug . '_license_key' );
 		$this->_addon_title   = $gwp_addon_class::get_instance()->plugin_page_title();
+		$this->_addon_path    = $gwp_addon_class::get_instance()->get_path();
 
-		$this->_appsero_client = new \Appsero\Client( $license_hash, $this->_addon_title, __FILE__ );
+		$this->_appsero_client = new \Appsero\Client( $license_hash, $this->_addon_title, $this->_addon_path );
 
 		$this->_license_handler = $this->_appsero_client->license();
 
@@ -102,7 +112,7 @@ class LicenseHandler {
 	 * @return void
 	 */
 	public function action_admin_notices() {
-		$site_slug = $this->_addon_class::get_instance()->gwp_site_slug;
+		$site_slug           = $this->_addon_class::get_instance()->gwp_site_slug;
 		$primary_button_link = admin_url( 'admin.php?page=gf_settings&subview=' . $this->_addon_slug );
 		if ( ! empty( $site_slug ) ) {
 			$url = "https://gravitywp.com/add-on/{$site_slug}/?utm_source=admin_notice&utm_medium=admin&utm_content=inactive&utm_campaign=Admin%20Notice";
