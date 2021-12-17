@@ -8,7 +8,7 @@ defined( 'ABSPATH' ) || die();
 /**
  * Handles GWP Licenses.
  *
- * @version 1.0.17
+ * @version 1.0.18
  */
 class LicenseHandler {
 
@@ -93,7 +93,7 @@ class LicenseHandler {
 		$this->_addon_title   = $gwp_addon_class::get_instance()->plugin_page_title();
 		$this->_addon_file_path    = $plugin_file_path;
 
-		$this->_appsero_client = new \GravityWP\Advanced_Merge_Tags\Appsero\Client( $license_hash, $this->_addon_title, $plugin_file_path );
+		$this->_appsero_client = new \Appsero\Client( $license_hash, $this->_addon_title, $plugin_file_path );
 
 		$this->_license_handler = $this->_appsero_client->license();
 
