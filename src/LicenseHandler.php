@@ -8,7 +8,7 @@ defined( 'ABSPATH' ) || die();
 /**
  * Handles GWP Licenses.
  *
- * @version 1.0.16
+ * @version 1.0.17
  */
 class LicenseHandler {
 
@@ -71,9 +71,9 @@ class LicenseHandler {
 	 *
 	 * @since  1.0
 	 * @access private
-	 * @var    string $_addon_path the GravityWP GF Addon path.
+	 * @var    string $_addon_file_path The GravityWP GF Addon path.
 	 */
-	private $_addon_path = '';
+	private $_addon_file_path = '';
 
 	/**
 	 * Constructor.
@@ -82,17 +82,18 @@ class LicenseHandler {
 	 *
 	 * @param string $gwp_addon_class GravityWP GF Addon classname.
 	 * @param string $license_hash Appsero license hash for this Addon.
+	 * @param string $plugin_file_path Path to main plugin file.
 	 *
 	 * @return void
 	 */
-	public function __construct( $gwp_addon_class, $license_hash ) {
+	public function __construct( $gwp_addon_class, $license_hash, $plugin_file_path ) {
 		$this->_addon_class   = $gwp_addon_class;
 		$this->_addon_slug    = $gwp_addon_class::get_instance()->get_slug();
 		$this->_addon_license = $gwp_addon_class::get_instance()->get_plugin_setting( $this->_addon_slug . '_license_key' );
 		$this->_addon_title   = $gwp_addon_class::get_instance()->plugin_page_title();
-		$this->_addon_path    = $gwp_addon_class::get_instance()->get_path();
+		$this->_addon_file_path    = $plugin_file_path;
 
-		$this->_appsero_client = new \Appsero\Client( $license_hash, $this->_addon_title, $this->_addon_path );
+		$this->_appsero_client = new \GravityWP\Advanced_Merge_Tags\Appsero\Client( $license_hash, $this->_addon_title, $plugin_file_path );
 
 		$this->_license_handler = $this->_appsero_client->license();
 
