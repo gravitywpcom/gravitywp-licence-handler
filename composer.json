@@ -8,6 +8,6 @@
     },
     "require": {
         "php": ">=7.0",
-        "appsero/client": "1.2.0"
+        "appsero/client": "^1.2"
     }
 }
