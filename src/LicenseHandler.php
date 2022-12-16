@@ -8,7 +8,7 @@ defined( 'ABSPATH' ) || die();
 /**
  * Handles GWP Licenses.
  *
- * @version 1.0.19
+ * @version 1.0.20
  */
 class LicenseHandler {
 
@@ -222,7 +222,7 @@ class LicenseHandler {
 					'license_key' => $field_setting,
 				)
 			);
-			// Reset the license handler, to unset the  $_license_handler->is_valid_licnese value.
+			// Reset the license handler, to unset the  $_license_handler->is_valid_license value.
 			$this->_license_handler = $this->_appsero_client->license();
 		}
 	}
