@@ -1,3 +1,7 @@
+= 1.0.21 = 
+- Show an error message when license activation fails.
+- Fix error icon being shown directly after saving a correct license.
+
 = 1.0.20 = 
 - Update comment to reflect changes in appsero 1.2.2.
 - Added changelog.

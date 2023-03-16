@@ -1,4 +1,11 @@
 <?php
+/**
+ * GravityWP License handler.
+ *
+ * @package gravitywp-license-handler
+ * @license MIT
+ */
+
 namespace GravityWP\LicenseHandler;
 
 use GFCommon;
@@ -8,7 +15,7 @@ defined( 'ABSPATH' ) || die();
 /**
  * Handles GWP Licenses.
  *
- * @version 1.0.20
+ * @version 1.0.21
  */
 class LicenseHandler {
 
@@ -58,6 +65,15 @@ class LicenseHandler {
 	private $_addon_license = '';
 
 	/**
+	 * Store the GravityWP GF Addon license hash.
+	 *
+	 * @since  1.0
+	 * @access private
+	 * @var    string $_addon_license_hash the GravityWP GF Addon license hash.
+	 */
+	private $_addon_license_hash = '';
+
+	/**
 	 * Store the GravityWP GF Addon title
 	 *
 	 * @since  1.0
@@ -87,24 +103,44 @@ class LicenseHandler {
 	 * @return void
 	 */
 	public function __construct( $gwp_addon_class, $license_hash, $plugin_file_path ) {
-		$this->_addon_class   = $gwp_addon_class;
-		$this->_addon_slug    = $gwp_addon_class::get_instance()->get_slug();
-		$this->_addon_license = $gwp_addon_class::get_instance()->get_plugin_setting( $this->_addon_slug . '_license_key' );
-		$this->_addon_title   = $gwp_addon_class::get_instance()->plugin_page_title();
+		$this->_addon_class        = $gwp_addon_class;
+		$this->_addon_slug         = $gwp_addon_class::get_instance()->get_slug();
+		$this->_addon_license      = $gwp_addon_class::get_instance()->get_plugin_setting( $this->_addon_slug . '_license_key' );
+		$this->_addon_license_hash = $license_hash;
+		$this->_addon_title        = $gwp_addon_class::get_instance()->plugin_page_title();
 		$this->_addon_file_path    = $plugin_file_path;
 
-		$this->_appsero_client = new \Appsero\Client( $license_hash, $this->_addon_title, $plugin_file_path );
+		if ( $this->initialize_appsero_client() ) {
 
-		$this->_license_handler = $this->_appsero_client->license();
+			if ( $this->_license_handler->is_valid() ) {
+				$this->_appsero_client->updater();
 
-		if ( $this->_license_handler->is_valid() ) {
-			$this->_appsero_client->updater();
-
-		} else {
-			add_action( 'admin_notices', array( $this, 'action_admin_notices' ) );
+			} else {
+				add_action( 'admin_notices', array( $this, 'action_admin_notices' ) );
+			}
 		}
 	}
 
+	/**
+	 * Initialize or reinitialize the Appsero client.
+	 *
+	 * @return bool
+	 */
+	public function initialize_appsero_client() {
+		try {
+			unset( $this->_appsero_client );
+			unset( $this->_license_handler );
+
+			$this->_appsero_client = new \Appsero\Client( $this->_addon_license_hash, $this->_addon_title, $this->_addon_file_path );
+
+			$this->_license_handler = $this->_appsero_client->license();
+		} catch ( \Exception $e ) {
+			$this->_addon_class::get_instance()->log_error( __CLASS__ . '::' . __METHOD__ . '(): License client failed to initialize: ' . $e->getMessage() );
+			return false;
+		}
+
+		return true;
+	}
 	/**
 	 * Display an admin notice.
 	 *
@@ -121,6 +157,7 @@ class LicenseHandler {
 			$url = 'https://gravitywp.com/add-ons/?utm_source=admin_notice&utm_medium=admin&utm_content=inactive&utm_campaign=Admin%20Notice';
 		}
 
+		/* translators: button tags */
 		$message = esc_html__( 'Your %1$s license has not been actived. This means you are missing out on security fixes, updates and support.%2$sActivate your license%3$s or %4$sget a license here%5$s', 'gravitywp-license-handler' );
 		$message = sprintf( $message, $this->_addon_title, '<br /><br /><a href="' . esc_url( $primary_button_link ) . '" class="button button-primary">', '</a>', '<a href="' . esc_url( $url ) . '" class="button button-secondary">', '</a>' );
 
@@ -187,7 +224,11 @@ class LicenseHandler {
 			GFCommon::remove_dismissible_message( $this->_addon_slug . '_license_notice' );
 			return true;
 		}
-
+		$message = 'Failed to activate this license key.';
+		if ( ! empty( $this->_license_handler->error ) ) {
+			$message = $this->_license_handler->error;
+		}
+		$this->_addon_class::get_instance()->set_field_error( $field, $message );
 		return false;
 	}
 
@@ -214,6 +255,9 @@ class LicenseHandler {
 		}
 
 		if ( ! empty( $field_setting ) ) {
+			// Reset the license handler, to reset the  $_license_handler->is_valid_license value.
+			$this->initialize_appsero_client();
+
 			// Send the remote request to activate the new license.
 			$this->_license_handler->license_form_submit(
 				array(
@@ -222,8 +266,6 @@ class LicenseHandler {
 					'license_key' => $field_setting,
 				)
 			);
-			// Reset the license handler, to unset the  $_license_handler->is_valid_license value.
-			$this->_license_handler = $this->_appsero_client->license();
 		}
 	}
 }
