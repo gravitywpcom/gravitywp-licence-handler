@@ -1,3 +1,7 @@
+
+= 1.1.0 =
+- Update license handler to support and work with Paddlepress Pro.
+
 = 1.0.21 = 
 - Show an error message when license activation fails.
 - Fix error icon being shown directly after saving a correct license.

@@ -4,11 +4,15 @@
  *
  * @package gravitywp-license-handler
  * @license MIT
+ *
+ * Modified by __root__ on 28-November-2023 using Strauss.
+ * @see https://github.com/BrianHenryIE/strauss
  */
 
 namespace GravityWP\LicenseHandler;
 
 use GFCommon;
+use GravityWP\Updater;
 
 defined( 'ABSPATH' ) || die();
 
@@ -18,22 +22,84 @@ defined( 'ABSPATH' ) || die();
  * @version 1.0.21
  */
 class LicenseHandler {
-
 	/**
-	 * Store the initialized app_sero client
+	 * Update endpoint of the API
 	 *
-	 * @since  1.0
-	 * @access private
-	 * @var    Object $_appsero_client The app_sero client instance.
+	 * @var $result_count
 	 */
-	private $_appsero_client = null;
+	private $api_url = '';
 
 	/**
-	 * Store the initialized app_sero license handler
+	 * HTTP parameters on API requests
+	 *
+	 * @var $api_data
+	 */
+	private $api_data = array();
+
+	/**
+	 * Plugin Name
+	 *
+	 * @var $name
+	 */
+	private $name = '';
+
+	/**
+	 * Whether update from the beta version or not
+	 *
+	 * @var $slug
+	 */
+	private $beta;
+
+	/**
+	 * Current version of plugin
+	 *
+	 * @var mixed|string
+	 */
+	private $version = '';
+
+	/**
+	 * WP Override flag
+	 *
+	 * @var $wp_override
+	 */
+	private $wp_override = false;
+
+	/**
+	 * Cache key
+	 *
+	 * @var string
+	 */
+	private $cache_key = '';
+
+	/**
+	 * Product slug
+	 *
+	 * @var $download_tag
+	 */
+	private $_download_tag = '';
+
+	/**
+	 * Health check timeout
+	 *
+	 * @var $health_check_timeout
+	 */
+	private $health_check_timeout = 5;
+
+	/**
+	 * Store the initialized paddlepress_pro client
 	 *
 	 * @since  1.0
 	 * @access private
-	 * @var    Object $_appsero_client The app_sero client instance.
+	 * @var    Object $_paddlepress_client The paddlepress_pro client instance.
+	 */
+	private $_paddlepress_client = null;
+
+	/**
+	 * Store the initialized paddlepress_pro license handler
+	 *
+	 * @since  1.0
+	 * @access private
+	 * @var    Object $_paddlepress_client The paddlepress_pro client instance.
 	 */
 	private $_license_handler = null;
 
@@ -92,48 +158,64 @@ class LicenseHandler {
 	private $_addon_file_path = '';
 
 	/**
+	 * Store the GravityWP constants
+	 *
+	 * @since  1.0
+	 * @access protected
+	 * @var    array<mixed>|string|false|null $_gwp_get_defined_constants The GravityWP constants.
+	 */
+	protected $_gwp_get_defined_constants;
+
+	/**
 	 * Constructor.
 	 *
 	 * @since  1.0
 	 *
 	 * @param string $gwp_addon_class GravityWP GF Addon classname.
-	 * @param string $license_hash Appsero license hash for this Addon.
+	 * @param string $license_hash Paddlepress license hash for this Addon.
 	 * @param string $plugin_file_path Path to main plugin file.
 	 *
 	 * @return void
 	 */
-	public function __construct( $gwp_addon_class, $license_hash, $plugin_file_path ) {
-		$this->_addon_class        = $gwp_addon_class;
-		$this->_addon_slug         = $gwp_addon_class::get_instance()->get_slug();
-		$this->_addon_license      = $gwp_addon_class::get_instance()->get_plugin_setting( $this->_addon_slug . '_license_key' );
-		$this->_addon_license_hash = $license_hash;
-		$this->_addon_title        = $gwp_addon_class::get_instance()->plugin_page_title();
-		$this->_addon_file_path    = $plugin_file_path;
-
-		if ( $this->initialize_appsero_client() ) {
-
-			if ( $this->_license_handler->is_valid() ) {
-				$this->_appsero_client->updater();
-
-			} else {
-				add_action( 'admin_notices', array( $this, 'action_admin_notices' ) );
-			}
+	public function __construct( $gwp_addon_class, $plugin_file_path ) {
+		$doing_cron = defined( 'DOING_CRON' ) && DOING_CRON;
+		if ( ! current_user_can( 'manage_options' ) && ! $doing_cron ) {
+			return;
 		}
+		$this->_addon_class               = $gwp_addon_class;
+		$this->_addon_file_path           = $plugin_file_path;
+		$this->_addon_slug                = $gwp_addon_class::get_instance()->get_slug();
+		$this->_addon_license = $gwp_addon_class::get_instance()->get_plugin_setting( $this->_addon_slug . '_license_key' );
+		$this->initialize_paddlepress_client();
 	}
 
 	/**
-	 * Initialize or reinitialize the Appsero client.
+	 * Initialize or reinitialize the Paddlepress client .
 	 *
 	 * @return bool
 	 */
-	public function initialize_appsero_client() {
+	public function initialize_paddlepress_client( $field_setting = null ) {
 		try {
-			unset( $this->_appsero_client );
+			unset( $this->_paddlepress_client );
 			unset( $this->_license_handler );
+			$license_key            = ! empty( $field_setting ) ? $field_setting : $this->_addon_license;
+			$this->_license_handler = new Plugin_Updater(
+				$this->_addon_file_path,
+				array(
+					'version'      => $gwp_addon_class::get_instance()->version, // current version number.
+					'license_key'  => $license_key,                 // license key (used get_option above to retrieve from DB)..'error'
+					'license_url'  => home_url(),                   // license domain.
+					'download_tag' => $this->_addon_slug, // download tag slug.
+					'beta'         => false,
+				)
+			);
 
-			$this->_appsero_client = new \Appsero\Client( $this->_addon_license_hash, $this->_addon_title, $this->_addon_file_path );
-
-			$this->_license_handler = $this->_appsero_client->license();
+			$use_cached_info = ! empty( $field_setting ) ? false : true;
+			if ( $this->_license_handler->gwp_is_valid( $use_cached_info, $license_key ) ) {
+				remove_action( 'admin_notices', array( $this, 'action_admin_notices' ) );
+			} else {
+				add_action( 'admin_notices', array( $this, 'action_admin_notices' ) );
+			}
 		} catch ( \Exception $e ) {
 			$this->_addon_class::get_instance()->log_error( __CLASS__ . '::' . __METHOD__ . '(): License client failed to initialize: ' . $e->getMessage() );
 			return false;
@@ -141,6 +223,7 @@ class LicenseHandler {
 
 		return true;
 	}
+
 	/**
 	 * Display an admin notice.
 	 *
@@ -158,19 +241,10 @@ class LicenseHandler {
 		}
 
 		/* translators: button tags */
-		$message = esc_html__( 'Your %1$s license has not been actived. This means you are missing out on security fixes, updates and support.%2$sActivate your license%3$s or %4$sget a license here%5$s', 'gravitywp-license-handler' );
+		$message = esc_html__( 'Your %1$s license has not been activated. This means you are missing out on security fixes, updates and support.%2$sActivate your license%3$s or %4$sget a license here%5$s', 'gravitywp-license-handler' );
 		$message = sprintf( $message, $this->_addon_title, '<br /><br /><a href="' . esc_url( $primary_button_link ) . '" class="button button-primary">', '</a>', '<a href="' . esc_url( $url ) . '" class="button button-secondary">', '</a>' );
 
-		$key = $this->_addon_slug . '_license_notice';
-
-		$notice = array(
-			'key'          => $key,
-			'capabilities' => $this->_addon_slug . '_app_settings',
-			'type'         => 'error',
-			'text'         => $message,
-		);
-
-		$notices = array( $notice );
+		$key = $this->_addon_slug . '_license_message_notice';
 
 		GFCommon::add_dismissible_message( $message, $key, 'warning', false, true );
 	}
@@ -199,10 +273,34 @@ class LicenseHandler {
 			'error_message'       => esc_html__( 'Invalid or expired license', 'gravitywp-license-handler' ),
 		);
 
-		return array(
-			'title'  => esc_html__( 'To unlock plugin updates and support, please enter your license key below', 'gravitywp-license-handler' ),
-			'fields' => array( $license_field ),
-		);
+		$license_field['title']  = esc_html__( 'To unlock plugin updates and support, please enter your license key below', 'gravitywp-license-handler' );
+		$license_field['fields'] = array( $license_field );
+
+		return $license_field;
+	}
+
+	/**
+	 * Handle license key activation or deactivation and on save the settings.
+	 *
+	 * @since  1.0
+	 *
+	 * @param array  $field The field properties.
+	 * @param string $field_setting The submitted value of the license_key field.
+	 */
+	public function license_validation( $field, $field_setting ) {
+		if ( empty( $field_setting ) ) {
+			return;
+		}
+		if ( $this->_license_handler->request_is_activate( $field_setting ) ) {
+			GFCommon::remove_dismissible_message( $this->_addon_slug . '_license_message_notice' );
+		} else {
+			$message = 'Failed to activate this license key.';
+			if ( ! empty( $this->_license_handler->error_messages ) ) {
+				$message = $this->_license_handler->error_messages;
+			}
+			$this->_addon_class::get_instance()->set_field_error( $field, $message );
+			$this->action_admin_notices();
+		}
 	}
 
 	/**
@@ -219,53 +317,17 @@ class LicenseHandler {
 		if ( empty( $value ) ) {
 			return null;
 		}
-
-		if ( $this->_license_handler->is_valid() ) {
-			GFCommon::remove_dismissible_message( $this->_addon_slug . '_license_notice' );
+		if ( $this->_license_handler->request_is_activate( $value ) ) {
+			GFCommon::remove_dismissible_message( $this->_addon_slug . '_license_message_notice' );
 			return true;
-		}
-		$message = 'Failed to activate this license key.';
-		if ( ! empty( $this->_license_handler->error ) ) {
-			$message = $this->_license_handler->error;
-		}
-		$this->_addon_class::get_instance()->set_field_error( $field, $message );
-		return false;
-	}
-
-
-	/**
-	 * Handle license key activation or deactivation.
-	 *
-	 * @since  1.0
-	 *
-	 * @param array  $field The field properties.
-	 * @param string $field_setting The submitted value of the license_key field.
-	 */
-	public function license_validation( $field, $field_setting ) {
-		$old_license = $this->_addon_class::get_instance()->get_plugin_setting( $this->_addon_slug . '_license_key' );
-		if ( $old_license && $field_setting !== $old_license ) {
-			// Send the remote request to deactivate the old license.
-			$this->_license_handler->license_form_submit(
-				array(
-					'_nonce'      => wp_create_nonce( $this->_addon_title ), // create a nonce with name.
-					'_action'     => 'deactive', // active, deactive.
-					'license_key' => '', // no need to provide if you want to deactive.
-				)
-			);
-		}
-
-		if ( ! empty( $field_setting ) ) {
-			// Reset the license handler, to reset the  $_license_handler->is_valid_license value.
-			$this->initialize_appsero_client();
-
-			// Send the remote request to activate the new license.
-			$this->_license_handler->license_form_submit(
-				array(
-					'_nonce'      => wp_create_nonce( $this->_addon_title ), // create a nonce with name.
-					'_action'     => 'active', // active, deactive.
-					'license_key' => $field_setting,
-				)
-			);
+		} else {
+			$message = $this->_license_handler->error_messages;
+			if ( ! empty( $this->_license_handler->error_messages ) ) {
+				$message = $this->_license_handler->error_messages;
+			}
+			$this->_addon_class::get_instance()->set_field_error( $field, $message );
+			$this->action_admin_notices();
+			return false;
 		}
 	}
 }
