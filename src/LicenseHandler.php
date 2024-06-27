@@ -12,7 +12,7 @@
 namespace GravityWP\LicenseHandler;
 
 use GFCommon;
-use GravityWP\Updater;
+use GravityWP\Updater\Plugin_Updater;
 
 defined( 'ABSPATH' ) || die();
 
@@ -172,7 +172,6 @@ class LicenseHandler {
 	 * @since  1.0
 	 *
 	 * @param string $gwp_addon_class GravityWP GF Addon classname.
-	 * @param string $license_hash Paddlepress license hash for this Addon.
 	 * @param string $plugin_file_path Path to main plugin file.
 	 *
 	 * @return void
@@ -182,15 +181,15 @@ class LicenseHandler {
 		if ( ! current_user_can( 'manage_options' ) && ! $doing_cron ) {
 			return;
 		}
-		$this->_addon_class               = $gwp_addon_class;
-		$this->_addon_file_path           = $plugin_file_path;
-		$this->_addon_slug                = $gwp_addon_class::get_instance()->get_slug();
-		$this->_addon_license = $gwp_addon_class::get_instance()->get_plugin_setting( $this->_addon_slug . '_license_key' );
+		$this->_addon_class     = $gwp_addon_class;
+		$this->_addon_file_path = $plugin_file_path;
+		$this->_addon_slug      = $gwp_addon_class::get_instance()->get_slug();
+		$this->_addon_license   = $gwp_addon_class::get_instance()->get_plugin_setting( $this->_addon_slug . '_license_key' );
 		$this->initialize_paddlepress_client();
 	}
 
 	/**
-	 * Initialize or reinitialize the Paddlepress client .
+	 * Initialize or reinitialize the Paddlepress client.
 	 *
 	 * @return bool
 	 */
@@ -202,7 +201,7 @@ class LicenseHandler {
 			$this->_license_handler = new Plugin_Updater(
 				$this->_addon_file_path,
 				array(
-					'version'      => $gwp_addon_class::get_instance()->version, // current version number.
+					'version'      => $this->_addon_class::get_instance()->get_version(), // current version number.
 					'license_key'  => $license_key,                 // license key (used get_option above to retrieve from DB)..'error'
 					'license_url'  => home_url(),                   // license domain.
 					'download_tag' => $this->_addon_slug, // download tag slug.

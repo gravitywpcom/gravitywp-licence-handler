@@ -1,5 +1,7 @@
+= 2.0.3 =
+- Fixing  the class name and small issues.
 
-= 1.1.0 =
+= 2.0.0 =
 - Update license handler to support and work with Paddlepress Pro.
 
 = 1.0.21 = 
