@@ -31,14 +31,14 @@ class Plugin_Updater {
 	 *
 	 * @var $result_count
 	 */
-	private $api_url_update = 'https://stg-mygravitywpcom-accmygwp.kinsta.cloud/wp-json/paddlepress-api/v1/update';
+	private $api_url_update = 'https://my.gravitywp.com/wp-json/paddlepress-api/v1/update';
 
 	/**
 	 * GravityWP license url endpoint of the API
 	 *
 	 * @var $result_count
 	 */
-	private $api_url_license = 'https://stg-mygravitywpcom-accmygwp.kinsta.cloud/wp-json/paddlepress-api/v1/license';
+	private $api_url_license = 'https://my.gravitywp.com/wp-json/paddlepress-api/v1/license';
 
 	/**
 	 * HTTP parameters on API requests

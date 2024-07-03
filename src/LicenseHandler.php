@@ -5,8 +5,6 @@
  * @package gravitywp-license-handler
  * @license MIT
  *
- * Modified by __root__ on 28-November-2023 using Strauss.
- * @see https://github.com/BrianHenryIE/strauss
  */
 
 namespace GravityWP\LicenseHandler;
@@ -19,7 +17,7 @@ defined( 'ABSPATH' ) || die();
 /**
  * Handles GWP Licenses.
  *
- * @version 1.0.21
+ * @version 2.0
  */
 class LicenseHandler {
 	/**
