@@ -1,3 +1,7 @@
+
+= 2.0.1 =
+- Fix php fatal error in generate error Messages.
+
 = 2.0.0 =
 - Update license handler to support and work with Paddlepress Pro.
 
