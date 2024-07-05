@@ -210,6 +210,9 @@ class Plugin_Updater {
 			} elseif ( isset( $json_data['message'] ) ) {
 				$this->error_messages = nl2br( $this->generateErrorMessage( $json_data['message'] ) );
 				return false;
+			} else {
+				$this->error_messages = nl2br( $this->generateErrorMessage( 'Please try again later. If the issue persists, please contact support.' ) );
+				return false;
 			}
 		}
 	}
