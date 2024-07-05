@@ -204,8 +204,14 @@ class Plugin_Updater {
 			$json_data = json_decode( $body, true );
 			if ( isset( $json_data['success'] ) && $json_data['success'] === true ) {
 				return true;
+			} elseif ( isset( $json_data['errors'] ) ) {
+					$this->error_messages = nl2br( $this->generateErrorMessage( $json_data['errors'] ) );
+					return false;
+			} elseif ( isset( $json_data['message'] ) ) {
+				$this->error_messages = nl2br( $this->generateErrorMessage( $json_data['message'] ) );
+				return false;
 			} else {
-				$this->error_messages = nl2br( $this->generateErrorMessage( $json_data['errors'] ) ); // 'Something went wrong: ' . print_r( $json_data['errors'], true );
+				$this->error_messages = nl2br( $this->generateErrorMessage( 'Please try again later. If the issue persists, please contact support.' ) );
 				return false;
 			}
 		}
@@ -225,20 +231,27 @@ class Plugin_Updater {
 	 *
 	 * @return string A formatted error message string.
 	 */
-	public function generateErrorMessage( $errorArray ) {
+	public function generateErrorMessage( $error ) {
 		// Initialize the error message string with a prefix.
 		$errorMessage = "Something went wrong:\n";
-
-		// Loop through each entry in the error array.
-		foreach ( $errorArray as $key => $messages ) {
-			// Loop through each message in the current entry.
-			foreach ( $messages as $message ) {
-				// Sanitize the error message to remove any harmful content.
-				$sanitized_message = sanitize_text_field( $message );
-
-				// Append the sanitized message to the error message string.
-				$errorMessage .= "- $sanitized_message\n";
+		if ( is_array( $error ) ) {
+			// Loop through each entry in the error array.
+			foreach ( $error as $key => $messages ) {
+				if ( is_array( $messages ) ) {
+					// Loop through each message in the current entry.
+					foreach ( $messages as $message ) {
+						// Sanitize the error message to remove any harmful content.
+						$sanitized_message = sanitize_text_field( $message );
+						// Append the sanitized message to the error message string.
+						$errorMessage .= "- $sanitized_message\n";
+					}
+				} else {
+					$sanitized_message = sanitize_text_field( $messages );
+					$errorMessage     .= "- $sanitized_message\n";
+				}
 			}
+		} else {
+			$errorMessage .= $error;
 		}
 
 		// Return the formatted error message string.
