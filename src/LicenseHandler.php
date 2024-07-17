@@ -17,7 +17,7 @@ defined( 'ABSPATH' ) || die();
 /**
  * Handles GWP Licenses.
  *
- * @version 2.0.2
+ * @version 2.0.3
  */
 class LicenseHandler {
 	/**
@@ -183,6 +183,7 @@ class LicenseHandler {
 		$this->_addon_file_path = $plugin_file_path;
 		$this->_addon_slug      = $gwp_addon_class::get_instance()->get_slug();
 		$this->_addon_license   = $gwp_addon_class::get_instance()->get_plugin_setting( $this->_addon_slug . '_license_key' );
+		$this->_addon_title     = $gwp_addon_class::get_instance()->plugin_page_title();
 		$this->initialize_paddlepress_client();
 	}
 
