@@ -1,4 +1,7 @@
 
+= 2.0.2 =
+- Fix issue with with license activation.
+
 = 2.0.1 =
 - Fix php fatal error in generate error Messages.
 
