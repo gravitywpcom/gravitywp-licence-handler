@@ -2,7 +2,8 @@
 /**
  * Custom Plugin Updater
  *
- * @package PaddlePress
+ * @package gravitywp-license-handler
+ *
  */
 
 namespace GravityWP\Updater;
@@ -202,11 +203,14 @@ class Plugin_Updater {
 		} else {
 			$body      = wp_remote_retrieve_body( $response );
 			$json_data = json_decode( $body, true );
-			if ( isset( $json_data['success'] ) && $json_data['success'] === true ) {
+			if ( isset( $json_data['success'] ) && $json_data['success'] === true && isset( $json_data['license_status'] ) && $json_data['license_status'] === 'valid' ) {
 				return true;
 			} elseif ( isset( $json_data['errors'] ) ) {
-					$this->error_messages = nl2br( $this->generateErrorMessage( $json_data['errors'] ) );
-					return false;
+				if ( count( $json_data['errors'] ) === 1 && ! empty( $json_data['errors']['unregistered_license_domain'] ) ) {
+					return true;
+				}
+				$this->error_messages = nl2br( $this->generateErrorMessage( $json_data['errors'] ) );
+				return false;
 			} elseif ( isset( $json_data['message'] ) ) {
 				$this->error_messages = nl2br( $this->generateErrorMessage( $json_data['message'] ) );
 				return false;
