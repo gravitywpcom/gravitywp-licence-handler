@@ -1,3 +1,5 @@
+= 2.0.3 =
+- Fix plugin name not showing in admin notice.
 
 = 2.0.2 =
 - Fix issue with with license activation.
