@@ -17,7 +17,7 @@ defined( 'ABSPATH' ) || die();
 /**
  * Handles GWP Licenses.
  *
- * @version 2.0.3
+ * @version 2.0.5
  */
 class LicenseHandler {
 	/**
@@ -274,9 +274,9 @@ class LicenseHandler {
 			'error_message'       => esc_html__( 'Invalid or expired license', 'gravitywp-license-handler' ),
 		);
 
-		$license_field['title']  = esc_html__( 'To unlock plugin updates and support, please enter your license key below', 'gravitywp-license-handler' );
 		$license_field['fields'] = array( $license_field );
-
+		$license_field['title']  = esc_html__( 'To unlock plugin updates and support, please enter your license key below', 'gravitywp-license-handler' );
+		
 		return $license_field;
 	}
 

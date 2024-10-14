@@ -1,3 +1,6 @@
+= 2.0.5 =
+- Fix non unique #id in plugin setting.
+
 = 2.0.4 =
 - Optimizing the validation function caches the result.
 
