@@ -11,12 +11,12 @@
 namespace GravityWP\Shared;
 
 /*
- * Check if the GlobalLicenseKeyLoader class has already been defined.
+ * Check if the Global_License_Key_Loader class has already been defined.
  * If not, define it to avoid redeclaration issues.
  */
-if ( ! class_exists( '\GravityWP\Shared\GlobalLicenseKeyLoader' ) ) {
+if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Loader' ) ) {
 	/**
-	 * Class GlobalLicenseKeyLoader
+	 * Class Global_License_Key_Loader
 	 *
 	 * Responsible for registering and loading the last version of a shared component.
 	 */
@@ -73,5 +73,5 @@ if ( ! class_exists( '\GravityWP\Shared\GlobalLicenseKeyLoader' ) ) {
 	}
 
 
-	add_action( 'init', array( '\GravityWP\Shared\GlobalLicenseKeyLoader', 'load_last_version' ), 999 );
+	add_action( 'init', array( '\GravityWP\Shared\Global_License_Key_Loader', 'load_last_version' ), 999 );
 }
