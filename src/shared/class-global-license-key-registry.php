@@ -74,12 +74,12 @@ class Global_License_Key_Registry {
 		$global_key = get_option( 'gravitywp_global_license_key', '' );
 		?>
 		<div class="wrap">
-			<h1><?php esc_html__( 'GravityWP Settings', 'gravitywp-license-handler' ); ?> </h1>
+			<h1><?php echo esc_html__( 'GravityWP Settings', 'gravitywp-license-handler' ); ?> </h1>
 			<form method="post" action="options.php">
 				<?php settings_fields( 'gravitywp_settings_group' ); ?>
 				<table class="form-table">
 					<tr>
-						<th scope="row"><label for="gravitywp_global_license_key"><?php esc_html__( 'Global License Key ', 'gravitywp-license-handler' ); ?></label></th>
+						<th scope="row"><label for="gravitywp_global_license_key"><?php echo esc_html__( 'Global License Key ', 'gravitywp-license-handler' ); ?></label></th>
 						<td>
 							<input type="password" name="gravitywp_global_license_key" value="<?php echo esc_attr( $global_key ); ?>" class="regular-text" />
 						</td>
