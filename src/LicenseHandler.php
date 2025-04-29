@@ -4,7 +4,6 @@
  *
  * @package gravitywp-license-handler
  * @license MIT
- *
  */
 
 namespace GravityWP\LicenseHandler;
@@ -53,7 +52,7 @@ class LicenseHandler {
 	 *
 	 * @var mixed|string
 	 */
-	private $version = '';
+	private $version = '2.0.6';
 
 	/**
 	 * WP Override flag
@@ -175,37 +174,51 @@ class LicenseHandler {
 	 * @return void
 	 */
 	public function __construct( $gwp_addon_class, $plugin_file_path ) {
+		// Load the loader class (only once).
+		if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Loader' ) ) {
+			require_once __DIR__ . '/shared/class-global-license-key-loader.php';
+		} elseif ( $this->version ) {
+			// Register this plugin’s version.
+			\GravityWP\Shared\Global_License_Key_Loader::register( $this->version, __DIR__ . '/shared/class-global-license-key-registry.php' );
+		}
+
 		$doing_cron = defined( 'DOING_CRON' ) && DOING_CRON;
 		if ( ! current_user_can( 'manage_options' ) && ! $doing_cron ) {
 			return;
 		}
-		$this->_addon_class     = $gwp_addon_class;
-		$this->_addon_file_path = $plugin_file_path;
-		$this->_addon_slug      = $gwp_addon_class::get_instance()->get_slug();
-		$this->_addon_license   = $gwp_addon_class::get_instance()->get_plugin_setting( $this->_addon_slug . '_license_key' );
-		$this->_addon_title     = $gwp_addon_class::get_instance()->plugin_page_title();
+		$this->_addon_class        = $gwp_addon_class;
+		$this->_addon_file_path    = $plugin_file_path;
+		$this->_addon_slug         = $gwp_addon_class::get_instance()->get_slug();
+		$this->_addon_license      = $gwp_addon_class::get_instance()->get_plugin_setting( $this->_addon_slug . '_license_key' );
+		$this->_addon_title        = $gwp_addon_class::get_instance()->plugin_page_title();
+		$this->_global_license_key = get_option( 'gravitywp_global_license_key', '' );
 		$this->initialize_paddlepress_client();
 	}
 
 	/**
 	 * Initialize or reinitialize the Paddlepress client.
 	 *
-	 * @return bool
+	 * @param string|null $field_setting Optional license key override from a field or custom setting.
+	 * @return bool True if initialization succeeded, false otherwise.
 	 */
 	public function initialize_paddlepress_client( $field_setting = null ) {
 		try {
 			unset( $this->_paddlepress_client );
 			unset( $this->_license_handler );
-			$license_key            = ! empty( $field_setting ) ? $field_setting : $this->_addon_license;
+			$license_key = ! empty( $field_setting ) ? $field_setting : $this->_addon_license;
+
+			if ( empty( $license_key ) ) {
+				$license_key = $this->_global_license_key;
+			}
 
 			$this->_license_handler = new Plugin_Updater(
 				$this->_addon_file_path,
 				array(
-					'version'      => $this->_addon_class::get_instance()->get_version(), // current version number.
-					'license_key'  => $license_key,                 // license key (used get_option above to retrieve from DB)..'error'
-					'license_url'  => home_url(),                   // license domain.
-					'download_tag' => $this->_addon_slug, // download tag slug.
-					'beta'         => false,
+					'version'       => $this->_addon_class::get_instance()->get_version(), // current version number.
+					'license_key'   => $license_key,                 // license key (used get_option above to retrieve from DB)..'error'.
+					'license_url'   => home_url(),                   // license domain.
+					'download_tag'  => $this->_addon_slug, // download tag slug.
+					'beta'          => false,
 					'handler_class' => $this,
 				)
 			);
@@ -216,7 +229,6 @@ class LicenseHandler {
 			} else {
 				add_action( 'admin_notices', array( $this, 'action_admin_notices' ) );
 			}
-			
 		} catch ( \Exception $e ) {
 			$this->_addon_class::get_instance()->log_error( __CLASS__ . '::' . __METHOD__ . '(): License client failed to initialize: ' . $e->getMessage() );
 			return false;
@@ -257,26 +269,59 @@ class LicenseHandler {
 	 *
 	 * @return array
 	 */
+	/**
+	 * Define plugin settings fields.
+	 *
+	 * @since  1.0
+	 *
+	 * @return array
+	 */
 	public function plugin_settings_license_fields() {
-		$this->_addon_license = $this->_addon_class::get_instance()->get_plugin_setting( $this->_addon_slug . '_license_key' );
+		$this->_addon_license = $this->_addon_class::get_instance()->get_plugin_setting(
+			$this->_addon_slug . '_license_key'
+		);
 
+		$license_key_name = $this->_addon_slug . '_license_key';
+
+		// Main license input field.
 		$license_field = array(
-			'name'                => $this->_addon_slug . '_license_key',
-			'tooltip'             => esc_html__( 'Enter the license key you received after purchasing the plugin.', 'gravitywp-license-handler' ),
+			'name'                => $license_key_name,
 			'label'               => esc_html__( 'License Key', 'gravitywp-license-handler' ),
+			'tooltip'             => esc_html__( 'Enter the license key you received after purchasing the plugin.', 'gravitywp-license-handler' ),
 			'type'                => 'text',
 			'input_type'          => 'password',
 			'class'               => 'medium',
 			'default_value'       => '',
-			'required'            => true,
+			'required'            => false,
 			'validation_callback' => array( $this, 'license_validation' ),
 			'feedback_callback'   => array( $this, 'license_feedback' ),
-			'error_message'       => esc_html__( 'Invalid or expired license', 'gravitywp-license-handler' ),
+			'error_message'       => esc_html__( 'Invalid or expired license.', 'gravitywp-license-handler' ),
+			'title'               => esc_html__( 'To unlock plugin updates and support, please enter your license key below.', 'gravitywp-license-handler' ),
 		);
 
-		$license_field['fields'] = array( $license_field );
-		$license_field['title']  = esc_html__( 'To unlock plugin updates and support, please enter your license key below', 'gravitywp-license-handler' );
-		
+		// Determine current license state.
+		$plugin_license_key = $this->_addon_license ?? '';
+		$global_license_key = $this->_global_license_key ?? '';
+
+		// Add contextual note based on key presence.
+		$license_field['fields'][] = array(
+			'name' => 'license_note',
+			'type' => 'html',
+			'html' => function () use ( $plugin_license_key, $global_license_key ) {
+				if ( ! empty( $plugin_license_key ) && ! empty( $global_license_key ) ) {
+					$message = esc_html__( 'The plugin license key will override the global license key. To use the global key, leave this field empty.', 'gravitywp-license-handler' );
+				} elseif ( empty( $plugin_license_key ) && ! empty( $global_license_key ) ) {
+					$message = esc_html__( 'Using the global license key.', 'gravitywp-license-handler' );
+				} else {
+					$message = esc_html__( 'No license key provided.', 'gravitywp-license-handler' );
+				}
+				return '<span>' . $message . '</span>';
+			},
+		);
+
+		// Nest the main license field inside the parent group.
+		$license_field['fields'][] = $license_field;
+
 		return $license_field;
 	}
 
