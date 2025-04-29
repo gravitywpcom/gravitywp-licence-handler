@@ -128,13 +128,13 @@ class LicenseHandler {
 	private $_addon_license = '';
 
 	/**
-	 * Store the GravityWP GF Addon license hash.
+	 * Store the GravityWP Global License Key.
 	 *
 	 * @since  1.0
 	 * @access private
-	 * @var    string $_addon_license_hash the GravityWP GF Addon license hash.
+	 * @var    string $_global_license_key Global License Key.
 	 */
-	private $_addon_license_hash = '';
+	private $_global_license_key = '';
 
 	/**
 	 * Store the GravityWP GF Addon title
@@ -175,11 +175,11 @@ class LicenseHandler {
 	 */
 	public function __construct( $gwp_addon_class, $plugin_file_path ) {
 		// Load the loader class (only once).
-		if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Loader' ) ) {
+		if ( ! class_exists( '\GravityWP\GravityWP_List_Datepicker\GravityWP\Shared\Global_License_Key_Loader' ) ) {
 			require_once __DIR__ . '/shared/class-global-license-key-loader.php';
 		} elseif ( $this->version ) {
 			// Register this plugin’s version.
-			\GravityWP\Shared\Global_License_Key_Loader::register( $this->version, __DIR__ . '/shared/class-global-license-key-registry.php' );
+			\GravityWP\GravityWP_List_Datepicker\GravityWP\Shared\Global_License_Key_Loader::register( $this->version, __DIR__ . '/shared/class-global-license-key-registry.php' );
 		}
 
 		$doing_cron = defined( 'DOING_CRON' ) && DOING_CRON;
@@ -269,13 +269,6 @@ class LicenseHandler {
 	 *
 	 * @return array
 	 */
-	/**
-	 * Define plugin settings fields.
-	 *
-	 * @since  1.0
-	 *
-	 * @return array
-	 */
 	public function plugin_settings_license_fields() {
 		$this->_addon_license = $this->_addon_class::get_instance()->get_plugin_setting(
 			$this->_addon_slug . '_license_key'
@@ -285,22 +278,32 @@ class LicenseHandler {
 
 		// Main license input field.
 		$license_field = array(
-			'name'                => $license_key_name,
-			'label'               => esc_html__( 'License Key', 'gravitywp-license-handler' ),
-			'tooltip'             => esc_html__( 'Enter the license key you received after purchasing the plugin.', 'gravitywp-license-handler' ),
-			'type'                => 'text',
-			'input_type'          => 'password',
-			'class'               => 'medium',
-			'default_value'       => '',
-			'required'            => false,
-			'validation_callback' => array( $this, 'license_validation' ),
-			'feedback_callback'   => array( $this, 'license_feedback' ),
-			'error_message'       => esc_html__( 'Invalid or expired license.', 'gravitywp-license-handler' ),
-			'title'               => esc_html__( 'To unlock plugin updates and support, please enter your license key below.', 'gravitywp-license-handler' ),
+			'title'  => esc_html__( 'To unlock plugin updates and support, please enter your license key below.', 'gravitywp-license-handler' ),
+			'fields' => array(
+				array(
+					'name'                => $license_key_name,
+					'label'               => esc_html__( 'Plugin License Key', 'gravitywp-license-handler' ),
+					'tooltip'             => esc_html__( 'Enter the license key you received after purchasing the plugin.', 'gravitywp-license-handler' ),
+					'type'                => 'text',
+					'input_type'          => 'password',
+					'class'               => 'medium',
+					'default_value'       => '',
+					'required'            => false,
+					'validation_callback' => array( $this, 'license_validation' ),
+					'feedback_callback'   => array( $this, 'license_feedback' ),
+					'error_message'       => esc_html__( 'Invalid or expired license.', 'gravitywp-license-handler' ),
+				),
+			),
 		);
 
 		// Determine current license state.
-		$plugin_license_key = $this->_addon_license ?? '';
+		if ( isset( $_POST[ '_gform_setting_' . $this->_addon_slug . '_license_key' ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			// If the form is submitted, use the posted value.
+			$plugin_license_key = rgpost( '_gform_setting_' . $this->_addon_slug . '_license_key' );
+		} else {
+			// Otherwise, use the stored value.
+			$plugin_license_key = $this->_addon_license ?? '';
+		}
 		$global_license_key = $this->_global_license_key ?? '';
 
 		// Add contextual note based on key presence.
@@ -308,19 +311,24 @@ class LicenseHandler {
 			'name' => 'license_note',
 			'type' => 'html',
 			'html' => function () use ( $plugin_license_key, $global_license_key ) {
+				$global_settings_url  = admin_url( 'admin.php?page=gravitywp-settings' );
+				$global_settings_text = esc_html__( 'Global License Key', 'gravitywp-license-handler' );
+				$message_color = 'inherit';
 				if ( ! empty( $plugin_license_key ) && ! empty( $global_license_key ) ) {
-					$message = esc_html__( 'The plugin license key will override the global license key. To use the global key, leave this field empty.', 'gravitywp-license-handler' );
+					/* translators: %s: link to global settings */
+					$message = sprintf( esc_html__( 'This Plugin License Key overrides the %s. To use the global key, leave this field empty.', 'gravitywp-license-handler') , '<a href="' . esc_url( $global_settings_url ) . '">' . esc_html( $global_settings_text ) . '</a>' );
 				} elseif ( empty( $plugin_license_key ) && ! empty( $global_license_key ) ) {
-					$message = esc_html__( 'Using the global license key.', 'gravitywp-license-handler' );
+					/* translators: %s: link to global settings */
+					$message = sprintf( esc_html__( 'A %s is active. If needed you can override the Global Key with the Plugin Key.', 'gravitywp-license-handler' ), '<a href="' . esc_url( $global_settings_url ) . '">' . esc_html( $global_settings_text ) . '</a>' );
+					$message_color = 'green';
 				} else {
-					$message = esc_html__( 'No license key provided.', 'gravitywp-license-handler' );
+					$message_color = 'red';
+					/* translators: %s: link to global settings */
+					$message = sprintf( esc_html__( 'No active license. If you have an All Access License you can set up a %s.', 'gravitywp-license-handler' ), '<a href="' . esc_url( $global_settings_url ) . '">' . esc_html( $global_settings_text ) . '</a>' );
 				}
-				return '<span>' . $message . '</span>';
+				return '<span style="color:' . esc_attr( $message_color ) . ';">' . $message . '</span>';
 			},
 		);
-
-		// Nest the main license field inside the parent group.
-		$license_field['fields'][] = $license_field;
 
 		return $license_field;
 	}
