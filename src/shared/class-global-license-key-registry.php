@@ -18,6 +18,14 @@ namespace GravityWP\Shared;
  * used across GravityWP plugins and extensions.
  */
 class Global_License_Key_Registry {
+
+	/**
+	 * Used version of plugin.
+	 *
+	 * @var mixed|string
+	 */
+	private static $version;
+
 	/**
 	 * Initializes the GravityWP settings page functionality.
 	 *
@@ -25,9 +33,11 @@ class Global_License_Key_Registry {
 	 * - Add the settings page to the admin menu.
 	 * - Register the plugin settings.
 	 *
+	 * @param string $version The current License handler version to assign to the settings loader.
 	 * @return void
 	 */
-	public static function init() {
+	public static function init( $version ) {
+		self::$version = $version;
 		add_action( 'admin_menu', array( self::class, 'add_admin_menu' ) );
 		add_action( 'admin_init', array( self::class, 'register_settings' ) );
 	}
