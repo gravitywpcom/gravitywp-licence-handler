@@ -224,7 +224,36 @@ class Plugin_Updater {
 				$this->error_messages = nl2br( $this->generateErrorMessage( $json_data['message'] ) );
 				return false;
 			} else {
-				$this->error_messages = nl2br( $this->generateErrorMessage( 'Please try again later. If the issue persists, please contact support.' ) );
+				// Retrieve HTTP status code and headers for additional context.
+				$http_code = wp_remote_retrieve_response_code( $response );
+				$headers   = wp_remote_retrieve_headers( $response );
+
+				// Check for block by Cloudflare.
+				if ( $http_code === 403 && strpos( strtolower( $body ), 'cloudflare' ) !== false ) {
+					$this->error_messages = nl2br(
+						$this->generateErrorMessage(
+							'Access to the license server was denied by Cloudflare. This happens when malicious activity was detected from your website\'s outgoing IP address. This often happens on shared hosting where other users use the same IP address for malicious activity. Contact your hosting provider to resolve this issue. For more information, visit <a href="https://gravitywp.com/doc/license-activation-issues/">this page</a>.'
+						)
+					);
+					return false;
+				}
+
+				// Format additional information into a string for logging or support use.
+				$extra_info = sprintf(
+					"HTTP Status Code: %d\nResponse Headers: %s",
+					$http_code,
+					json_encode( $headers )
+				);
+
+				// Provide a detailed error message including the response code, extra info, and a reference URL.
+				$this->error_messages = nl2br(
+					$this->generateErrorMessage(
+						sprintf(
+							'An unexpected error occurred. Please try again later. You can also refer to <a href="https://gravitywp.com/doc/license-activation-issues/">this page</a> for more details. If the issue persists, provide the following information to support: %s.',
+							esc_html( $extra_info )  // Ensure special characters in the info are safely included in an HTML context.
+						)
+					)
+				);
 				return false;
 			}
 		}
@@ -260,7 +289,7 @@ class Plugin_Updater {
 					}
 				} else {
 					$sanitized_message = sanitize_text_field( $messages );
-					$error_message     .= "- $sanitized_message\n";
+					$error_message    .= "- $sanitized_message\n";
 				}
 			}
 		} else {
@@ -325,13 +354,13 @@ class Plugin_Updater {
 	/**
 	 * Checks the plugin's license status and updates the transient data accordingly.
 	 *
-	 * This method verifies the validity of the plugin's license key and updates the cached 
-	 * license status. It also manages admin notices based on the validation result. If the 
-	 * license key is valid, it removes any existing admin notices. Otherwise, it adds an 
+	 * This method verifies the validity of the plugin's license key and updates the cached
+	 * license status. It also manages admin notices based on the validation result. If the
+	 * license key is valid, it removes any existing admin notices. Otherwise, it adds an
 	 * admin notice to inform the user about the invalid license status.
 	 *
 	 * Key Details:
-	 * - Verifies if the current context is not the plugins page in a multisite network, 
+	 * - Verifies if the current context is not the plugins page in a multisite network,
 	 *   and returns early if true.
 	 * - Checks existing transient data for license status response, and skips further checks
 	 *   if the data is already populated unless overridden.
@@ -351,37 +380,37 @@ class Plugin_Updater {
 	 * @uses set_version_info_cache() Caches the result of the license key validation.
 	 * @uses gwp_is_valid() Validates the license key using cached data or via API.
 	 */
-	public function check_update_license($_transient_data) {
+	public function check_update_license( $_transient_data ) {
 		global $pagenow;
 
 		// Ensure $_transient_data is an object.
-		if (!is_object($_transient_data)) {
+		if ( ! is_object( $_transient_data ) ) {
 			$_transient_data = new stdClass();
 		}
 
 		// Return early if on the plugins page in a multisite network.
-		if ('plugins.php' === $pagenow && is_multisite()) {
+		if ( 'plugins.php' === $pagenow && is_multisite() ) {
 			return $_transient_data;
 		}
 
 		// Check if the transient data already has a response and is not being overridden.
-		if (!empty($_transient_data->response) && !empty($_transient_data->response[$this->name]) && false === $this->wp_override) {
+		if ( ! empty( $_transient_data->response ) && ! empty( $_transient_data->response[ $this->name ] ) && false === $this->wp_override ) {
 			return $_transient_data;
 		}
 
 		// Retrieve license key and generate a unique cache key.
 		$license_key      = $this->api_data['license_key'];
-		$status_cache_key = 'paddlepress_status_request_' . md5(serialize($this->slug . $this->api_data['license_key'] . $this->beta)); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize
+		$status_cache_key = 'paddlepress_status_request_' . md5( serialize( $this->slug . $this->api_data['license_key'] . $this->beta ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize
 
 		// Validate the license key through the API and update the cache.
-		$status = $this->request_is_activate($license_key);
-		$this->set_version_info_cache($status, $status_cache_key);
+		$status = $this->request_is_activate( $license_key );
+		$this->set_version_info_cache( $status, $status_cache_key );
 
 		// Validate the license key and manage admin notices based on validity.
-		if ($this->gwp_is_valid(false, $license_key)) {
-			remove_action('admin_notices', array($this->handler_class, 'action_admin_notices'));
+		if ( $this->gwp_is_valid( false, $license_key ) ) {
+			remove_action( 'admin_notices', array( $this->handler_class, 'action_admin_notices' ) );
 		} else {
-			add_action('admin_notices', array($this->handler_class, 'action_admin_notices'));
+			add_action( 'admin_notices', array( $this->handler_class, 'action_admin_notices' ) );
 		}
 
 		return $_transient_data;
@@ -522,7 +551,7 @@ class Plugin_Updater {
 
 		if ( empty( $update_cache->response ) || empty( $update_cache->response[ $this->name ] ) ) {
 
-			$version_info = $this->get_cached_version_info(); //  || false;
+			$version_info = $this->get_cached_version_info(); // || false;
 
 			if ( false === $version_info ) {
 				$version_info = $this->api_request(
