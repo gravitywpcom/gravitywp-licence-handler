@@ -228,11 +228,11 @@ class Plugin_Updater {
 				$http_code = wp_remote_retrieve_response_code( $response );
 				$headers   = wp_remote_retrieve_headers( $response );
 
-				// check for block by Cloudflare.
+				// Check for block by Cloudflare.
 				if ( $http_code === 403 && strpos( strtolower( $body ), 'cloudflare' ) !== false ) {
 					$this->error_messages = nl2br(
 						$this->generateErrorMessage(
-							'Access to the license server was denied by Cloudflare. This happens when malicious activity was detected from your website\'s outgoing IP address. This often happens on shared hosting where other users use the same IP address for malicious activity. Contact your hosting provider to resolve this issue.'
+							'Access to the license server was denied by Cloudflare. This happens when malicious activity was detected from your website\'s outgoing IP address. This often happens on shared hosting where other users use the same IP address for malicious activity. Contact your hosting provider to resolve this issue. For more information, visit <a href="https://gravitywp.com/doc/license-activation-issues/">this page</a>.'
 						)
 					);
 					return false;
@@ -245,12 +245,12 @@ class Plugin_Updater {
 					json_encode( $headers )
 				);
 
-				// Provide a detailed error message including the response code and extra info.
+				// Provide a detailed error message including the response code, extra info, and a reference URL.
 				$this->error_messages = nl2br(
 					$this->generateErrorMessage(
 						sprintf(
-							'An unexpected error occurred. Please try again later. If the issue persists, provide the following information to support: %s',
-							esc_html( $extra_info )  // Ensure special characters in the info are safely included in a HTML context.
+							'An unexpected error occurred. Please try again later. You can also refer to <a href="https://gravitywp.com/doc/license-activation-issues/">this page</a> for more details. If the issue persists, provide the following information to support: %s.',
+							esc_html( $extra_info )  // Ensure special characters in the info are safely included in an HTML context.
 						)
 					)
 				);
