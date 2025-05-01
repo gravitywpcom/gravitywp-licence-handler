@@ -118,8 +118,9 @@ class Global_License_Key_Registry {
 								if ( class_exists( '\GravityWP\Shared\Global_License_Key_Loader' ) ) {
 									$gwp_addons = \GravityWP\Shared\Global_License_Key_Loader::get_registered_license_handlers();
 									foreach ( $gwp_addons as $gwp_addon ) {
-										if ( class_exists( $gwp_addon['gwp_addon_class'] ) ) {
-											$gwp_addon_slug = $gwp_addon['gwp_addon_class']::get_instance()->get_slug();
+										$gwp_addon_class = $gwp_addon['addon_class'] ?? '';
+										if ( $gwp_addon_class && class_exists( $gwp_addon_class ) ) {
+											$gwp_addon_slug = $gwp_addon_class::get_instance()->get_slug();
 											\GFCommon::remove_dismissible_message( $gwp_addon_slug . '_license_message_notice' );
 										}
 									}

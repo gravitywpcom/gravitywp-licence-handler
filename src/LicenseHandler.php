@@ -181,7 +181,7 @@ class LicenseHandler {
 
 		if ( $this->version ) {
 			// Register this plugin’s version.
-			\GravityWP\Shared\Global_License_Key_Loader::register( $this->version, __DIR__ . '/shared/class-global-license-key-registry.php' );
+			\GravityWP\Shared\Global_License_Key_Loader::register( $this->version, __DIR__ . '/shared/class-global-license-key-registry.php', $gwp_addon_class );
 		}
 
 		$doing_cron = defined( 'DOING_CRON' ) && DOING_CRON;
