@@ -175,11 +175,13 @@ class LicenseHandler {
 	 */
 	public function __construct( $gwp_addon_class, $plugin_file_path ) {
 		// Load the loader class (only once).
-		if ( ! class_exists( '\GravityWP\GravityWP_List_Datepicker\GravityWP\Shared\Global_License_Key_Loader' ) ) {
+		if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Loader' ) ) {
 			require_once __DIR__ . '/shared/class-global-license-key-loader.php';
-		} elseif ( $this->version ) {
+		}
+
+		if ( $this->version ) {
 			// Register this plugin’s version.
-			\GravityWP\GravityWP_List_Datepicker\GravityWP\Shared\Global_License_Key_Loader::register( $this->version, __DIR__ . '/shared/class-global-license-key-registry.php' );
+			\GravityWP\Shared\Global_License_Key_Loader::register( $this->version, __DIR__ . '/shared/class-global-license-key-registry.php' );
 		}
 
 		$doing_cron = defined( 'DOING_CRON' ) && DOING_CRON;
@@ -316,7 +318,7 @@ class LicenseHandler {
 				$message_color = 'inherit';
 				if ( ! empty( $plugin_license_key ) && ! empty( $global_license_key ) ) {
 					/* translators: %s: link to global settings */
-					$message = sprintf( esc_html__( 'This Plugin License Key overrides the %s. To use the global key, leave this field empty.', 'gravitywp-license-handler') , '<a href="' . esc_url( $global_settings_url ) . '">' . esc_html( $global_settings_text ) . '</a>' );
+					$message = sprintf( esc_html__( 'This Plugin License Key overrides the %s. To use the global key, leave this field empty.', 'gravitywp-license-handler' ), '<a href="' . esc_url( $global_settings_url ) . '">' . esc_html( $global_settings_text ) . '</a>' );
 				} elseif ( empty( $plugin_license_key ) && ! empty( $global_license_key ) ) {
 					/* translators: %s: link to global settings */
 					$message = sprintf( esc_html__( 'A %s is active. If needed you can override the Global Key with the Plugin Key.', 'gravitywp-license-handler' ), '<a href="' . esc_url( $global_settings_url ) . '">' . esc_html( $global_settings_text ) . '</a>' );
