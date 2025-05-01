@@ -34,13 +34,15 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Loader' ) ) {
 		 *
 		 * @param string $version   The version number of the candidate.
 		 * @param string $file_path The absolute path to the candidate file.
+		 * @param string $gwp_addon_class The GF Addon class name.
 		 *
 		 * @return void
 		 */
-		public static function register( $version, $file_path ) {
+		public static function register( $version, $file_path, $gwp_addon_class = '' ) {
 			self::$candidates[] = array(
-				'version' => $version,
-				'file'    => $file_path,
+				'version'     => $version,
+				'file'        => $file_path,
+				'addon_class' => $gwp_addon_class,
 			);
 		}
 		/**
@@ -70,8 +72,15 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Loader' ) ) {
 				\GravityWP\Shared\Global_License_Key_Registry::init( $last['version'] ); // Load the UI and logic.
 			}
 		}
+		/**
+		 * Returns the candidates array.
+		 *
+		 * @return array
+		 */
+		public static function get_registered_license_handlers() {
+			return self::$candidates;
+		}
 	}
-
 
 	add_action( 'init', array( '\GravityWP\Shared\Global_License_Key_Loader', 'load_last_version' ), 999 );
 }

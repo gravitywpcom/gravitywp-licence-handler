@@ -115,6 +115,15 @@ class Global_License_Key_Registry {
 							$decoded = json_decode( $body, true );
 							if ( is_array( $decoded ) && ! empty( $decoded['success'] ) && $decoded['license_status'] === 'valid' ) {
 								$data = $decoded;
+								if ( class_exists( '\GravityWP\Shared\Global_License_Key_Loader' ) ) {
+									$gwp_addons = \GravityWP\Shared\Global_License_Key_Loader::get_registered_license_handlers();
+									foreach ( $gwp_addons as $gwp_addon ) {
+										if ( class_exists( $gwp_addon['gwp_addon_class'] ) ) {
+											$gwp_addon_slug = $gwp_addon['gwp_addon_class']::get_instance()->get_slug();
+											\GFCommon::remove_dismissible_message( $gwp_addon_slug . '_license_message_notice' );
+										}
+									}
+								}
 							} else {
 								$error_message = 'Invalid license.';
 								self::extract_error_details( $decoded, $error_details );
@@ -128,7 +137,7 @@ class Global_License_Key_Registry {
 							$extra_info    = sprintf(
 								"HTTP Status Code: %d\nResponse Headers: %s",
 								$code,
-								json_encode( $headers )
+								wp_json_encode( $headers )
 							);
 							$error_message = nl2br( sprintf( 'An unexpected error occurred. Please try again later. If the issue persists, provide the following information to support: %s', esc_html( $extra_info ) ) );
 							self::extract_error_details( json_decode( $body, true ), $error_details );
