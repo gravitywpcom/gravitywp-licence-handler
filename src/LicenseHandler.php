@@ -321,8 +321,15 @@ class LicenseHandler {
 					$message = sprintf( esc_html__( 'This Plugin License Key overrides the %s. To use the global key, leave this field empty.', 'gravitywp-license-handler' ), '<a href="' . esc_url( $global_settings_url ) . '">' . esc_html( $global_settings_text ) . '</a>' );
 				} elseif ( empty( $plugin_license_key ) && ! empty( $global_license_key ) ) {
 					/* translators: %s: link to global settings */
-					$message = sprintf( esc_html__( 'A %s is active. If needed you can override the Global Key with the Plugin Key.', 'gravitywp-license-handler' ), '<a href="' . esc_url( $global_settings_url ) . '">' . esc_html( $global_settings_text ) . '</a>' );
-					$message_color = 'green';
+					if ( $this->_license_handler->gwp_is_valid( true, $global_license_key ) ) {
+						/* translators: %s: link to global settings */
+						$message = sprintf( esc_html__( 'A %s is active. If needed you can override the Global Key with the Plugin Key.', 'gravitywp-license-handler' ), '<a href="' . esc_url( $global_settings_url ) . '">' . esc_html( $global_settings_text ) . '</a>' );
+						$message_color = 'green';
+					} else {
+						/* translators: %s: link to global settings, link to gravitywp.com */
+						$message = sprintf( esc_html__( 'A %1$s is active, but it is not valid for this addon. You can override the Global Key with a specific Plugin Key or purchase an All Access license on %2$s.', 'gravitywp-license-handler' ), '<a href="' . esc_url( $global_settings_url ) . '">' . esc_html( $global_settings_text ) . '</a>', '<a href="https://gravitywp.com">gravitywp.com</a>' );
+						$message_color = 'red';
+					}
 				} else {
 					$message_color = 'red';
 					/* translators: %s: link to global settings */
