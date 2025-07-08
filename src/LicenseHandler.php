@@ -53,7 +53,7 @@ class LicenseHandler {
 	 *
 	 * @var mixed|string
 	 */
-	private $version = '';
+	private $version = '2.0.6';
 
 	/**
 	 * WP Override flag
@@ -129,13 +129,13 @@ class LicenseHandler {
 	private $_addon_license = '';
 
 	/**
-	 * Store the GravityWP GF Addon license hash.
+	 * Store the GravityWP Global License Key.
 	 *
 	 * @since  1.0
 	 * @access private
-	 * @var    string $_addon_license_hash the GravityWP GF Addon license hash.
+	 * @var    string $_global_license_key Global License Key.
 	 */
-	private $_addon_license_hash = '';
+	private $_global_license_key = '';
 
 	/**
 	 * Store the GravityWP GF Addon title
@@ -175,22 +175,34 @@ class LicenseHandler {
 	 * @return void
 	 */
 	public function __construct( $gwp_addon_class, $plugin_file_path ) {
+		// Load the loader class (only once).
+		if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Loader' ) ) {
+			require_once __DIR__ . '/shared/class-global-license-key-loader.php';
+		}
+
+		if ( $this->version ) {
+			// Register this plugin’s version.
+			\GravityWP\Shared\Global_License_Key_Loader::register( $this->version, __DIR__ . '/shared/class-global-license-key-registry.php', $gwp_addon_class );
+		}
+
 		$doing_cron = defined( 'DOING_CRON' ) && DOING_CRON;
 		if ( ! ( current_user_can( 'gform_full_access' ) || current_user_can( 'gravityforms_edit_settings' ) || current_user_can( 'gravityforms_view_settings' ) ) && ! $doing_cron ) {
 			return;
 		}
-		$this->_addon_class     = $gwp_addon_class;
-		$this->_addon_file_path = $plugin_file_path;
-		$this->_addon_slug      = $gwp_addon_class::get_instance()->get_slug();
-		$this->_addon_license   = $gwp_addon_class::get_instance()->get_plugin_setting( $this->_addon_slug . '_license_key' );
-		$this->_addon_title     = $gwp_addon_class::get_instance()->plugin_page_title();
+		$this->_addon_class        = $gwp_addon_class;
+		$this->_addon_file_path    = $plugin_file_path;
+		$this->_addon_slug         = $gwp_addon_class::get_instance()->get_slug();
+		$this->_addon_license      = $gwp_addon_class::get_instance()->get_plugin_setting( $this->_addon_slug . '_license_key' );
+		$this->_addon_title        = $gwp_addon_class::get_instance()->plugin_page_title();
+		$this->_global_license_key = get_option( 'gravitywp_global_license_key', '' );
 		$this->initialize_paddlepress_client();
 	}
 
 	/**
 	 * Initialize or reinitialize the Paddlepress client.
 	 *
-	 * @return bool
+	 * @param string|null $field_setting Optional license key override from a field or custom setting.
+	 * @return bool True if initialization succeeded, false otherwise.
 	 */
 	public function initialize_paddlepress_client( $field_setting = null ) {
 		try {
@@ -198,9 +210,18 @@ class LicenseHandler {
 			unset( $this->_license_handler );
 			$license_key = ! empty( $field_setting ) ? $field_setting : $this->_addon_license;
 
+			if ( empty( $license_key ) ) {
+				$license_key = $this->_global_license_key;
+			}
+
 			$this->_license_handler = new Plugin_Updater(
 				$this->_addon_file_path,
 				array(
+					'version'       => $this->_addon_class::get_instance()->get_version(), // current version number.
+					'license_key'   => $license_key,                 // license key (used get_option above to retrieve from DB)..'error'.
+					'license_url'   => home_url(),                   // license domain.
+					'download_tag'  => $this->_addon_slug, // download tag slug.
+					'beta'          => false,
 					'version'       => $this->_addon_class::get_instance()->get_version(), // current version number.
 					'license_key'   => $license_key,                 // license key (used get_option above to retrieve from DB)..'error'
 					'license_url'   => home_url(),                   // license domain.
@@ -257,25 +278,73 @@ class LicenseHandler {
 	 * @return array
 	 */
 	public function plugin_settings_license_fields() {
-		$this->_addon_license = $this->_addon_class::get_instance()->get_plugin_setting( $this->_addon_slug . '_license_key' );
-
-		$license_field = array(
-			'name'                => $this->_addon_slug . '_license_key',
-			'tooltip'             => esc_html__( 'Enter the license key you received after purchasing the plugin.', 'gravitywp-license-handler' ),
-			'label'               => esc_html__( 'License Key', 'gravitywp-license-handler' ),
-			'type'                => 'text',
-			'input_type'          => 'password',
-			'class'               => 'medium',
-			'default_value'       => '',
-			'required'            => true,
-			'validation_callback' => array( $this, 'license_validation' ),
-			'feedback_callback'   => array( $this, 'license_feedback' ),
-			'error_message'       => esc_html__( 'Invalid or expired license', 'gravitywp-license-handler' ),
+		$this->_addon_license = $this->_addon_class::get_instance()->get_plugin_setting(
+			$this->_addon_slug . '_license_key'
 		);
 
-		$license_field['fields'] = array( $license_field );
-		$license_field['title']  = esc_html__( 'To unlock plugin updates and support, please enter your license key below', 'gravitywp-license-handler' );
-		
+		$license_key_name = $this->_addon_slug . '_license_key';
+
+		// Main license input field.
+		$license_field = array(
+			'title'  => esc_html__( 'To unlock plugin updates and support, please enter your license key below.', 'gravitywp-license-handler' ),
+			'fields' => array(
+				array(
+					'name'                => $license_key_name,
+					'label'               => esc_html__( 'Plugin License Key', 'gravitywp-license-handler' ),
+					'tooltip'             => esc_html__( 'Enter the license key you received after purchasing the plugin.', 'gravitywp-license-handler' ),
+					'type'                => 'text',
+					'input_type'          => 'password',
+					'class'               => 'medium',
+					'default_value'       => '',
+					'required'            => false,
+					'validation_callback' => array( $this, 'license_validation' ),
+					'feedback_callback'   => array( $this, 'license_feedback' ),
+					'error_message'       => esc_html__( 'Invalid or expired license.', 'gravitywp-license-handler' ),
+				),
+			),
+		);
+
+		// Determine current license state.
+		if ( isset( $_POST[ '_gform_setting_' . $this->_addon_slug . '_license_key' ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			// If the form is submitted, use the posted value.
+			$plugin_license_key = rgpost( '_gform_setting_' . $this->_addon_slug . '_license_key' );
+		} else {
+			// Otherwise, use the stored value.
+			$plugin_license_key = $this->_addon_license ?? '';
+		}
+		$global_license_key = $this->_global_license_key ?? '';
+
+		// Add contextual note based on key presence.
+		$license_field['fields'][] = array(
+			'name' => 'license_note',
+			'type' => 'html',
+			'html' => function () use ( $plugin_license_key, $global_license_key ) {
+				$global_settings_url  = admin_url( 'admin.php?page=gravitywp-settings' );
+				$global_settings_text = esc_html__( 'Global License Key', 'gravitywp-license-handler' );
+				$message_color = 'inherit';
+				if ( ! empty( $plugin_license_key ) && ! empty( $global_license_key ) ) {
+					/* translators: %s: link to global settings */
+					$message = sprintf( esc_html__( 'This Plugin License Key overrides the %s. To use the global key, leave this field empty.', 'gravitywp-license-handler' ), '<a href="' . esc_url( $global_settings_url ) . '">' . esc_html( $global_settings_text ) . '</a>' );
+				} elseif ( empty( $plugin_license_key ) && ! empty( $global_license_key ) ) {
+					/* translators: %s: link to global settings */
+					if ( $this->_license_handler->gwp_is_valid( true, $global_license_key ) ) {
+						/* translators: %s: link to global settings */
+						$message = sprintf( esc_html__( 'A %s is active. If needed you can override the Global Key with the Plugin Key.', 'gravitywp-license-handler' ), '<a href="' . esc_url( $global_settings_url ) . '">' . esc_html( $global_settings_text ) . '</a>' );
+						$message_color = 'green';
+					} else {
+						/* translators: %s: link to global settings, link to gravitywp.com */
+						$message = sprintf( esc_html__( 'A %1$s is active, but it is not valid for this addon. You can override the Global Key with a specific Plugin Key or purchase an All Access license on %2$s.', 'gravitywp-license-handler' ), '<a href="' . esc_url( $global_settings_url ) . '">' . esc_html( $global_settings_text ) . '</a>', '<a href="https://gravitywp.com">gravitywp.com</a>' );
+						$message_color = 'red';
+					}
+				} else {
+					$message_color = 'red';
+					/* translators: %s: link to global settings */
+					$message = sprintf( esc_html__( 'No active license. If you have an All Access License you can set up a %s.', 'gravitywp-license-handler' ), '<a href="' . esc_url( $global_settings_url ) . '">' . esc_html( $global_settings_text ) . '</a>' );
+				}
+				return '<span style="color:' . esc_attr( $message_color ) . ';">' . $message . '</span>';
+			},
+		);
+
 		return $license_field;
 	}
 
