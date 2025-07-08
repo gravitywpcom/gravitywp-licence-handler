@@ -4,7 +4,6 @@
  *
  * @package gravitywp-license-handler
  * @license MIT
- *
  */
 
 namespace GravityWP\LicenseHandler;
@@ -20,6 +19,7 @@ defined( 'ABSPATH' ) || die();
  * @version 2.0.3
  */
 class LicenseHandler {
+
 	/**
 	 * Update endpoint of the API
 	 *
@@ -167,16 +167,16 @@ class LicenseHandler {
 	/**
 	 * Constructor.
 	 *
-	 * @since  1.0
+	 * @since 1.0
 	 *
-	 * @param string $gwp_addon_class GravityWP GF Addon classname.
+	 * @param string $gwp_addon_class  GravityWP GF Addon classname.
 	 * @param string $plugin_file_path Path to main plugin file.
 	 *
 	 * @return void
 	 */
 	public function __construct( $gwp_addon_class, $plugin_file_path ) {
 		$doing_cron = defined( 'DOING_CRON' ) && DOING_CRON;
-		if ( ! current_user_can( 'manage_options' ) && ! $doing_cron ) {
+		if ( ! ( current_user_can( 'gform_full_access' ) || current_user_can( 'gravityforms_edit_settings' ) || current_user_can( 'gravityforms_view_settings' ) ) && ! $doing_cron ) {
 			return;
 		}
 		$this->_addon_class     = $gwp_addon_class;
@@ -196,27 +196,26 @@ class LicenseHandler {
 		try {
 			unset( $this->_paddlepress_client );
 			unset( $this->_license_handler );
-			$license_key            = ! empty( $field_setting ) ? $field_setting : $this->_addon_license;
+			$license_key = ! empty( $field_setting ) ? $field_setting : $this->_addon_license;
 
 			$this->_license_handler = new Plugin_Updater(
 				$this->_addon_file_path,
 				array(
-					'version'      => $this->_addon_class::get_instance()->get_version(), // current version number.
-					'license_key'  => $license_key,                 // license key (used get_option above to retrieve from DB)..'error'
-					'license_url'  => home_url(),                   // license domain.
-					'download_tag' => $this->_addon_slug, // download tag slug.
-					'beta'         => false,
+					'version'       => $this->_addon_class::get_instance()->get_version(), // current version number.
+					'license_key'   => $license_key,                 // license key (used get_option above to retrieve from DB)..'error'
+					'license_url'   => home_url(),                   // license domain.
+					'download_tag'  => $this->_addon_slug, // download tag slug.
+					'beta'          => false,
 					'handler_class' => $this,
 				)
 			);
 
 			$use_cached_info = ! empty( $field_setting ) ? false : true;
 			if ( $this->_license_handler->gwp_is_valid( $use_cached_info, $license_key ) ) {
-				remove_action( 'admin_notices', array( $this, 'action_admin_notices' ) );
+					remove_action( 'admin_notices', array( $this, 'action_admin_notices' ) );
 			} else {
 				add_action( 'admin_notices', array( $this, 'action_admin_notices' ) );
 			}
-			
 		} catch ( \Exception $e ) {
 			$this->_addon_class::get_instance()->log_error( __CLASS__ . '::' . __METHOD__ . '(): License client failed to initialize: ' . $e->getMessage() );
 			return false;
@@ -228,7 +227,7 @@ class LicenseHandler {
 	/**
 	 * Display an admin notice.
 	 *
-	 * @since  1.0
+	 * @since 1.0
 	 *
 	 * @return void
 	 */
@@ -253,7 +252,7 @@ class LicenseHandler {
 	/**
 	 * Define plugin settings fields.
 	 *
-	 * @since  1.0
+	 * @since 1.0
 	 *
 	 * @return array
 	 */
@@ -283,9 +282,9 @@ class LicenseHandler {
 	/**
 	 * Handle license key activation or deactivation and on save the settings.
 	 *
-	 * @since  1.0
+	 * @since 1.0
 	 *
-	 * @param array  $field The field properties.
+	 * @param array  $field         The field properties.
 	 * @param string $field_setting The submitted value of the license_key field.
 	 */
 	public function license_validation( $field, $field_setting ) {
@@ -310,7 +309,7 @@ class LicenseHandler {
 	 * @param string $value The current value of the license_key field.
 	 * @param array  $field The field properties.
 	 *
-	 * @since  1.0
+	 * @since 1.0
 	 *
 	 * @return bool|null
 	 */
