@@ -217,15 +217,10 @@ class LicenseHandler {
 			$this->_license_handler = new Plugin_Updater(
 				$this->_addon_file_path,
 				array(
-					'version'       => $this->_addon_class::get_instance()->get_version(), // current version number.
-					'license_key'   => $license_key,                 // license key (used get_option above to retrieve from DB)..'error'.
-					'license_url'   => home_url(),                   // license domain.
-					'download_tag'  => $this->_addon_slug, // download tag slug.
-					'beta'          => false,
-					'version'       => $this->_addon_class::get_instance()->get_version(), // current version number.
-					'license_key'   => $license_key,                 // license key (used get_option above to retrieve from DB)..'error'
-					'license_url'   => home_url(),                   // license domain.
-					'download_tag'  => $this->_addon_slug, // download tag slug.
+					'version'       => $this->_addon_class::get_instance()->get_version(),      // current version number.
+					'license_key'   => $license_key,                                            // license key (used get_option above to retrieve from DB)..'error'.
+					'license_url'   => home_url(),                                              // license domain.
+					'download_tag'  => $this->_addon_slug,                                      // download tag slug.
 					'beta'          => false,
 					'handler_class' => $this,
 				)
