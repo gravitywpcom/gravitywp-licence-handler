@@ -40,6 +40,25 @@ class Global_License_Key_Registry {
 		self::$version = $version;
 		add_action( 'admin_menu', array( self::class, 'add_admin_menu' ) );
 		add_action( 'admin_init', array( self::class, 'register_settings' ) );
+		add_action( 'admin_enqueue_scripts', array( self::class, 'enqueue_admin_styles' ) );
+	}
+
+	/**
+	 * Enqueues admin styles for the GravityWP settings page.
+	 *
+	 * @param string $hook The current admin page hook.
+	 * @return void
+	 */
+	public static function enqueue_admin_styles( $hook ) {
+		// Check if we are on the GravityWP settings page.
+		if ( 'gravityforms_page_gravitywp-settings' === $hook ) {
+			wp_enqueue_style(
+				'gravitywp-admin-styles',
+				plugins_url( 'css/admin-styles.css', __FILE__ ),
+				array(),
+				self::$version
+			);
+		}
 	}
 
 	/**
