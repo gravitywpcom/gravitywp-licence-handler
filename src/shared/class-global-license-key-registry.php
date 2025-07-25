@@ -41,7 +41,7 @@ class Global_License_Key_Registry {
 		add_action( 'admin_menu', array( self::class, 'add_admin_menu' ) );
 		add_action( 'admin_init', array( self::class, 'register_settings' ) );
 	}
-	
+
 	/**
 	 * Registers the settings for the GravityWP plugin.
 	 *
@@ -94,6 +94,7 @@ class Global_License_Key_Registry {
 					'license_key' => $global_key,
 					'license_url' => home_url(),
 					'action'      => 'activate',
+					'glk_version' => esc_html( self::$version ),
 				),
 				'https://my.gravitywp.com/wp-json/paddlepress-api/v1/license'
 			);
