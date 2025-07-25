@@ -53,7 +53,7 @@ class LicenseHandler {
 	 *
 	 * @var mixed|string
 	 */
-	private $version = '2.0.6';
+	private $version = '2.1.0';
 
 	/**
 	 * WP Override flag

@@ -41,6 +41,18 @@ class Global_License_Key_Registry {
 		add_action( 'admin_menu', array( self::class, 'add_admin_menu' ) );
 		add_action( 'admin_init', array( self::class, 'register_settings' ) );
 	}
+	
+	/**
+	 * Registers the settings for the GravityWP plugin.
+	 *
+	 * This method registers the 'gravitywp_global_license_key' option
+	 * under the 'gravitywp_settings_group' settings group.
+	 *
+	 * @return void
+	 */
+	public static function register_settings() {
+		register_setting( 'gravitywp_settings_group', 'gravitywp_global_license_key' );
+	}
 
 	/**
 	 * Adds the GravityWP settings page to the WordPress admin menu.
@@ -59,17 +71,6 @@ class Global_License_Key_Registry {
 			'gravitywp-settings',
 			array( self::class, 'render_settings_page' )
 		);
-	}
-	/**
-	 * Registers the settings for the GravityWP plugin.
-	 *
-	 * This method registers the 'gravitywp_global_license_key' option
-	 * under the 'gravitywp_settings_group' settings group.
-	 *
-	 * @return void
-	 */
-	public static function register_settings() {
-		register_setting( 'gravitywp_settings_group', 'gravitywp_global_license_key' );
 	}
 
 	/**
@@ -151,53 +152,127 @@ class Global_License_Key_Registry {
 		<div class="wrap">
 			<h1>
 				<?php echo esc_html__( 'GravityWP Settings', 'gravitywp-license-handler' ); ?>
-				<span style="font-size: 0.6em; color: #666; margin-left: 10px;">
+				<span class='gwp_settings_version'>
 					(<?php echo esc_html( self::$version ); ?>)
 				</span>
 			</h1>
 			<form method="post" action="options.php">
-				<?php settings_fields( 'gravitywp_settings_group' ); ?>
-				<table class="form-table">
-					<tr>
-						<th scope="row">
-							<label for="gravitywp_global_license_key">
-								<?php echo esc_html__( 'Global License Key', 'gravitywp-license-handler' ); ?>
-							</label>
-						</th>
-						<td>
-							<input type="password" name="gravitywp_global_license_key" value="<?php echo esc_attr( $global_key ); ?>" class="regular-text" />
-						</td>
-					</tr>
-				</table>
-				<?php submit_button( 'Save Settings' ); ?>
-			</form>
-	
+				<?php settings_fields( 'gravitywp_settings_group' ); ?>					
+				<div class="gwp-license-key-row">
+					<label for="gravitywp_global_license_key" class="gwp-license-label">
+						<?php echo esc_html__( 'Global License Key', 'gravitywp-license-handler' ); ?>
+					</label>
+					<div class="password-input-wrapper">
+						<input type="password" id="gravitywp_global_license_key" name="gravitywp_global_license_key" class="gwp-license-input" value="<?php echo esc_attr( $global_key ); ?>">                
+						<button type="button" class="toggle-visibility-button" data-target="gravitywp_global_license_key" aria-label="Show license key">
+							<svg class="icon-eye" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+							<svg class="icon-eye-off" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
+						</button>
+					</div>
+					<?php submit_button( 'Save Settings' ); ?>
+				</div>				
+			</form>	
 			<?php if ( $data ) : ?>
-				<div class="license-info-box" style="margin-top: 30px; border: 1px solid #ccd0d4; background: #fefefe; padding: 20px; border-radius: 6px; max-width: 600px;">
-					<h2 style="margin-top: 0; color: #2271b1;">
-						<span class="dashicons dashicons-yes" style="color: #46b450; vertical-align: middle;"></span>
-						<?php esc_html_e( 'License Details', 'gravitywp-license-handler' ); ?>
-					</h2>
-					<ul style="list-style: none; padding-left: 0;">
-						<li><strong><?php esc_html_e( 'Status', 'gravitywp-license-handler' ); ?>:</strong> <?php echo esc_html( $data['license_status'] ); ?></li>
-						<li><strong><?php esc_html_e( 'License Expires', 'gravitywp-license-handler' ); ?>:</strong> <?php echo esc_html( $data['expires'] ); ?></li>
-						<li><strong><?php esc_html_e( 'License Limit', 'gravitywp-license-handler' ); ?>:</strong> <?php echo esc_html( $data['license_limit'] ); ?></li>
-						<li><strong><?php esc_html_e( 'Activated Sites', 'gravitywp-license-handler' ); ?>:</strong> <?php echo esc_html( $data['site_count'] ); ?></li>
-						<li><strong><?php esc_html_e( 'Activations Left', 'gravitywp-license-handler' ); ?>:</strong> <?php echo esc_html( $data['activations_left'] ); ?></li>
-					</ul>
+				<div class="gwp-license-box">
+					<div class="gwp-license-header">
+						<span class="dashicons dashicons-yes"></span>
+						<h2><?php esc_html_e( 'License Details', 'gravitywp-license-handler' ); ?></h2>
+					</div>
+					<div class="gwp-license-grid">
+						<div class="gwp-license-item">
+							<span class="label"><?php esc_html_e( 'Status', 'gravitywp-license-handler' ); ?></span>
+							<span class="value <?php echo esc_attr( $data['license_status'] === 'valid' ? 'success' : 'error' ); ?>">
+								<?php echo esc_html( ucfirst( $data['license_status'] ) ); ?>
+							</span>
+						</div>
+						<div class="gwp-license-item">
+							<span class="label"><?php esc_html_e( 'License Expires', 'gravitywp-license-handler' ); ?></span>
+							<span class="value"><?php echo esc_html( $data['expires'] ?? '' ); ?></span>
+						</div>
+						<div class="gwp-license-item">
+							<span class="label"><?php esc_html_e( 'License Limit', 'gravitywp-license-handler' ); ?></span>
+							<span class="value"><?php echo esc_html( $data['license_limit'] ?? '' ); ?></span>
+						</div>
+						<div class="gwp-license-item">
+							<span class="label"><?php esc_html_e( 'Activated Sites', 'gravitywp-license-handler' ); ?></span>
+							<span class="value"><?php echo esc_html( $data['site_count'] ?? '' ); ?></span>
+						</div>
+						<div class="gwp-license-item">
+							<span class="label"><?php esc_html_e( 'Activations Left', 'gravitywp-license-handler' ); ?></span>
+							<span class="value"><?php echo esc_html( $data['activations_left'] ?? '' ); ?></span>
+						</div>
+					</div>
 				</div>
-			<?php elseif ( ! empty( $global_key ) ) : ?>
-				<div class="license-error-box" style="margin-top: 30px; border: 1px solid #dc3232; background: #fff0f0; padding: 20px; border-radius: 6px; max-width: 600px;">
-					<h2 style="margin-top: 0; color: #dc3232;">
-						<span class="dashicons dashicons-no" style="color: #dc3232; vertical-align: middle;"></span>
-						<?php echo nl2br( esc_html( $error_message ) ); ?>
-					</h2>
-					<?php if ( $error_details ) : ?>
-						<div style="margin-top: 10px; color: #a00;"><?php echo wp_kses_post( $error_details ); ?></div>
-					<?php endif; ?>
-				</div>
-			<?php endif; ?>
+				<?php elseif ( ! empty( $global_key ) ) : ?>
+					<div class="gwp-license-error-box">
+						<div class="gwp-license-error-header">
+							<span class="dashicons dashicons-no"></span>
+							<h2><?php echo nl2br( esc_html( $error_message ) ); ?></h2>
+						</div>
+						<?php if ( $error_details ) : ?>
+							<div class="gwp-license-error-details">
+								<?php echo wp_kses_post( $error_details ); ?>
+							</div>
+						<?php endif; ?>
+					</div>
+				<?php endif; ?>
 		</div>
+		<script>
+			/**
+			 * Accessible Password Visibility Toggle
+			 *
+			 * This script waits for the DOM to be fully loaded, then attaches
+			 * event listeners to all password toggle buttons. It uses data-attributes
+			 * for robust targeting and updates ARIA attributes for accessibility.
+			 */
+			document.addEventListener('DOMContentLoaded', () => {
+				// Select all toggle buttons on the page
+				const toggleButtons = document.querySelectorAll('.toggle-visibility-button');
+
+				// Define the SVG icons for clarity
+				const iconEye = document.querySelector('.icon-eye');
+				const iconEyeOff = document.querySelector('.icon-eye-off');
+
+				// Attach a click event listener to each button
+				toggleButtons.forEach(button => {
+					button.addEventListener('click', function() {
+						// Get the ID of the target input from the data-target attribute
+						const targetInputId = this.dataset.target;
+						if (!targetInputId) {
+							console.error('Button is missing a data-target attribute.');
+							return;
+						}
+
+						const input = document.getElementById(targetInputId);
+						if (!input) {
+							console.error(`Input with ID "${targetInputId}" not found.`);
+							return;
+						}
+						
+						// Get the icons within this specific button
+						const showIcon = this.querySelector('.icon-eye');
+						const hideIcon = this.querySelector('.icon-eye-off');
+
+						// Check the current state and toggle it
+						const isPassword = input.type === 'password';
+						
+						if (isPassword) {
+							// If it's a password, change to text
+							input.type = 'text';
+							this.setAttribute('aria-label', 'Hide license key');
+							showIcon.style.display = 'none';
+							hideIcon.style.display = 'block';
+						} else {
+							// If it's text, change back to password
+							input.type = 'password';
+							this.setAttribute('aria-label', 'Show license key');
+							showIcon.style.display = 'block';
+							hideIcon.style.display = 'none';
+						}
+					});
+				});
+			});
+		</script>
 		<?php
 	}
 

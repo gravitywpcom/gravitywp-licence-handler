@@ -1,4 +1,4 @@
-= 2.0.6 =
+= 2.1.0 =
 - Implementing the global licensed key.
 
 = 2.0.5 =
