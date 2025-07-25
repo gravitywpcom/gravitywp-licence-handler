@@ -54,7 +54,7 @@ class Global_License_Key_Registry {
 		if ( 'forms_page_gravitywp-settings' === $hook ) {
 			wp_enqueue_style(
 				'gravitywp-admin-styles',
-				plugins_url( 'css/admin-styles.css', __FILE__ ),
+				plugins_url( 'css/gwp-styles.min.css', __FILE__ ),
 				array(),
 				self::$version
 			);
