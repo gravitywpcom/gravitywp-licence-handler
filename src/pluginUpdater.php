@@ -352,61 +352,56 @@ class Plugin_Updater {
 	}
 
 	/**
-	 * Checks the plugin's license status and updates the transient data accordingly.
+	 * Checks the plugin's license status using the centralized Hub cache.
 	 *
-	 * This method verifies the validity of the plugin's license key and updates the cached
-	 * license status. It also manages admin notices based on the validation result. If the
-	 * license key is valid, it removes any existing admin notices. Otherwise, it adds an
-	 * admin notice to inform the user about the invalid license status.
+	 * Since v2.1.0: Reads from Hub_Manager's shared cache instead of
+	 * making individual API calls. This is the key optimization —
+	 * one hub request serves ALL plugins.
 	 *
-	 * Key Details:
-	 * - Verifies if the current context is not the plugins page in a multisite network,
-	 *   and returns early if true.
-	 * - Checks existing transient data for license status response, and skips further checks
-	 *   if the data is already populated unless overridden.
-	 * - Retrieves the license key and generates a unique cache key for the status request.
-	 * - Calls the API to check the license activation status.
-	 * - Updates the license status cache with the API response.
-	 * - Based on the license validation result, either removes or adds admin notices.
-	 *
-	 * @param stdClass $_transient_data Transient data object containing update information.
-	 *                                  If not provided as an object, it initializes a new stdClass object.
-	 *
-	 * @global string $pagenow Current admin page identifier.
+	 * @param stdClass $_transient_data Transient data object.
 	 *
 	 * @return stdClass The (possibly modified) transient data object.
-	 *
-	 * @uses request_is_activate() Makes an API request to validate the license key.
-	 * @uses set_version_info_cache() Caches the result of the license key validation.
-	 * @uses gwp_is_valid() Validates the license key using cached data or via API.
 	 */
 	public function check_update_license( $_transient_data ) {
 		global $pagenow;
 
-		// Ensure $_transient_data is an object.
 		if ( ! is_object( $_transient_data ) ) {
 			$_transient_data = new stdClass();
 		}
 
-		// Return early if on the plugins page in a multisite network.
 		if ( 'plugins.php' === $pagenow && is_multisite() ) {
 			return $_transient_data;
 		}
 
-		// Check if the transient data already has a response and is not being overridden.
 		if ( ! empty( $_transient_data->response ) && ! empty( $_transient_data->response[ $this->name ] ) && false === $this->wp_override ) {
 			return $_transient_data;
 		}
 
-		// Retrieve license key and generate a unique cache key.
-		$license_key      = $this->api_data['license_key'];
-		$status_cache_key = 'paddlepress_status_request_' . md5( serialize( $this->slug . $this->api_data['license_key'] . $this->beta ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize
+		// Use Hub_Manager if available (v2.1.0+).
+		if ( class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
+			$has_access = \GravityWP\Shared\Hub_Manager::has_access( $this->slug );
 
-		// Validate the license key through the API and update the cache.
-		$status = $this->request_is_activate( $license_key );
+			if ( $has_access ) {
+				remove_action( 'admin_notices', array( $this->handler_class, 'action_admin_notices' ) );
+			} else {
+				add_action( 'admin_notices', array( $this->handler_class, 'action_admin_notices' ) );
+			}
+
+			return $_transient_data;
+		}
+
+		// Fallback to direct API call if Hub_Manager not loaded yet.
+		$license_key = get_option( 'gravitywp_global_license_key', '' );
+
+		if ( empty( $license_key ) ) {
+			add_action( 'admin_notices', array( $this->handler_class, 'action_admin_notices' ) );
+			return $_transient_data;
+		}
+
+		$status_cache_key = 'paddlepress_status_request_' . md5( serialize( $this->slug . $license_key . $this->beta ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize
+		$status           = $this->request_is_activate( $license_key );
 		$this->set_version_info_cache( $status, $status_cache_key );
 
-		// Validate the license key and manage admin notices based on validity.
 		if ( $this->gwp_is_valid( false, $license_key ) ) {
 			remove_action( 'admin_notices', array( $this->handler_class, 'action_admin_notices' ) );
 		} else {
@@ -447,8 +442,35 @@ class Plugin_Updater {
 			return $_transient_data;
 		}
 
-		$version_info = false; // $this->get_cached_version_info();
+		$version_info = false;
 
+		// Try Hub_Manager first (no extra API call needed).
+		if ( class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
+			$hub_plugin_data = \GravityWP\Shared\Hub_Manager::get_plugin_data( $this->slug );
+
+			if ( ! empty( $hub_plugin_data ) && ! empty( $hub_plugin_data['new_version'] ) ) {
+				$version_info = new stdClass();
+				$version_info->name        = $hub_plugin_data['name'] ?? '';
+				$version_info->slug        = $hub_plugin_data['slug'] ?? $this->slug;
+				$version_info->new_version = $hub_plugin_data['new_version'];
+				$version_info->url         = '';
+				$version_info->plugin      = $this->name;
+				$version_info->icons       = $hub_plugin_data['icons'] ?? [];
+				$version_info->banners     = $hub_plugin_data['banners'] ?? [];
+				$version_info->sections    = $hub_plugin_data['sections'] ?? [];
+				$version_info->requires    = $hub_plugin_data['requires'] ?? '';
+				$version_info->tested      = $hub_plugin_data['tested'] ?? '';
+				$version_info->requires_php = $hub_plugin_data['requires_php'] ?? '';
+
+				// Only include download link if license covers this plugin.
+				if ( ! empty( $hub_plugin_data['has_access'] ) && ! empty( $hub_plugin_data['download_link'] ) ) {
+					$version_info->package       = $hub_plugin_data['download_link'];
+					$version_info->download_link = $hub_plugin_data['download_link'];
+				}
+			}
+		}
+
+		// Fallback to direct API call if Hub didn't provide data.
 		if ( false === $version_info ) {
 			$version_info = $this->api_request(
 				'get_version',
@@ -459,7 +481,6 @@ class Plugin_Updater {
 				)
 			);
 
-			// Since we disabled our filter for the transient, we aren't running our object conversion on banners, sections, or icons. Do this now:
 			if ( isset( $version_info->banners ) && ! is_array( $version_info->banners ) ) {
 				$version_info->banners = $this->convert_object_to_array( $version_info->banners );
 			}
@@ -485,8 +506,6 @@ class Plugin_Updater {
 			if ( version_compare( $this->version, $version_info->new_version, '<' ) ) {
 
 				$_transient_data->response[ $this->name ] = $version_info;
-
-				// Make sure the plugin property is set to the plugin's name/location.
 				$_transient_data->response[ $this->name ]->plugin = $this->name;
 			} else {
 				$no_update              = new stdClass();

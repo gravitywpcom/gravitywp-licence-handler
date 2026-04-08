@@ -1,41 +1,39 @@
 <?php
 /**
- * Global License Key Loader class file.
+ * Global License Key Loader.
  *
- * Handles dynamic loading of the last available version of a shared component
- * across GravityWP plugins and extensions.
+ * Dynamically loads the highest-version shared components across GravityWP
+ * plugins. Each plugin bundles its own copy of the license handler; this
+ * loader picks the newest version to avoid conflicts.
  *
  * @package GravityWP\Shared
+ * @since   2.1.0
  */
 
 namespace GravityWP\Shared;
 
-/*
- * Check if the Global_License_Key_Loader class has already been defined.
- * If not, define it to avoid redeclaration issues.
- */
+defined( 'ABSPATH' ) || die();
+
 if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Loader' ) ) {
+
 	/**
 	 * Class Global_License_Key_Loader
-	 *
-	 * Responsible for registering and loading the last version of a shared component.
 	 */
 	class Global_License_Key_Loader {
+
 		/**
-		 * Holds registered candidate versions with their file paths.
+		 * Registered candidate versions.
 		 *
-		 * @var array
+		 * @var array<int, array{version: string, file: string, addon_class: string}>
 		 */
 		private static $candidates = array();
+
 		/**
-		 * Registers a version and its corresponding file path.
+		 * Register a version and its file path.
 		 *
-		 * This is called by various plugins or components that depend on this loader.
-		 *
-		 * @param string $version   The version number of the candidate.
-		 * @param string $file_path The absolute path to the candidate file.
-		 * @param string $gwp_addon_class The GF Addon class name.
-		 *
+		 * @param string $version         Version number.
+		 * @param string $file_path       Absolute path to the registry file.
+		 * @param string $gwp_addon_class GF addon class name.
 		 * @return void
 		 */
 		public static function register( $version, $file_path, $gwp_addon_class = '' ) {
@@ -45,8 +43,15 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Loader' ) ) {
 				'addon_class' => $gwp_addon_class,
 			);
 		}
+
 		/**
-		 * Loads the last (highest) version from the registered candidates.
+		 * Load the highest version of each shared component.
+		 *
+		 * Load order matters:
+		 * 1. Plan_Types (used by Registry, Hub_Manager, Hub_Page)
+		 * 2. Hub_Manager (used by Registry, Hub_Page)
+		 * 3. Registry (settings page)
+		 * 4. Hub_Page (catalog page)
 		 *
 		 * @return void
 		 */
@@ -55,9 +60,7 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Loader' ) ) {
 				return;
 			}
 
-			/*
-			 * Sort candidates in descending order by version number.
-			 */
+			// Sort candidates descending by version.
 			usort(
 				self::$candidates,
 				function ( $a, $b ) {
@@ -65,15 +68,39 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Loader' ) ) {
 				}
 			);
 
-			$last = self::$candidates[0];
-			require_once $last['file'];
+			$last     = self::$candidates[0];
+			$base_dir = dirname( $last['file'] );
 
+			// 1. Load Plan_Types first — dependency of others.
+			$plan_types_file = $base_dir . '/class-plan-types.php';
+			if ( file_exists( $plan_types_file ) ) {
+				require_once $plan_types_file;
+			}
+
+			// 2. Load Hub_Manager — dependency of Registry and Hub_Page.
+			$hub_manager_file = $base_dir . '/class-hub-manager.php';
+			if ( file_exists( $hub_manager_file ) ) {
+				require_once $hub_manager_file;
+			}
+
+			// 3. Load Registry (settings page).
+			require_once $last['file'];
 			if ( class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
-				\GravityWP\Shared\Global_License_Key_Registry::init( $last['version'] ); // Load the UI and logic.
+				\GravityWP\Shared\Global_License_Key_Registry::init( $last['version'], $base_dir );
+			}
+
+			// 4. Load Hub_Page (catalog page).
+			$hub_page_file = $base_dir . '/class-hub-page.php';
+			if ( file_exists( $hub_page_file ) ) {
+				require_once $hub_page_file;
+				if ( class_exists( '\GravityWP\Shared\Hub_Page' ) ) {
+					\GravityWP\Shared\Hub_Page::init();
+				}
 			}
 		}
+
 		/**
-		 * Returns the candidates array.
+		 * Return all registered license handlers.
 		 *
 		 * @return array
 		 */

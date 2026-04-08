@@ -1,0 +1,1005 @@
+/**
+ * GravityWP Admin Styles
+ *
+ * Modern, clean, minimal styles for the GravityWP Settings and Hub pages.
+ * Follows WordPress admin conventions while adding a polished touch.
+ *
+ * @package gravitywp-license-handler
+ * @since   2.1.0
+ */
+
+/* ==========================================================================
+   Root variables
+   ========================================================================== */
+
+.gwp-admin {
+	--gwp-primary: #2271b1;
+	--gwp-primary-dark: #135e96;
+	--gwp-success: #27ae60;
+	--gwp-warning: #f39c12;
+	--gwp-danger: #dc3232;
+	--gwp-info: #3498db;
+	--gwp-purple: #8e44ad;
+	--gwp-gray-50: #f8f9fa;
+	--gwp-gray-100: #f1f3f5;
+	--gwp-gray-200: #e9ecef;
+	--gwp-gray-300: #dee2e6;
+	--gwp-gray-400: #ced4da;
+	--gwp-gray-500: #adb5bd;
+	--gwp-gray-600: #868e96;
+	--gwp-gray-700: #495057;
+	--gwp-gray-800: #343a40;
+	--gwp-gray-900: #212529;
+	--gwp-border: #dcdcde;
+	--gwp-radius: 8px;
+	--gwp-radius-sm: 4px;
+	--gwp-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+	--gwp-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+	--gwp-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.04);
+	--gwp-transition: all 0.15s ease;
+}
+
+/* ==========================================================================
+   Page header
+   ========================================================================== */
+
+.gwp-admin {
+	max-width: 1400px;
+	margin: 20px 0 40px;
+}
+
+.gwp-admin-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: 16px;
+	margin-bottom: 24px;
+	padding-bottom: 16px;
+	border-bottom: 1px solid var(--gwp-border);
+}
+
+.gwp-admin-header__title {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin: 0;
+	font-size: 23px;
+	font-weight: 400;
+	color: var(--gwp-gray-900);
+}
+
+.gwp-admin-header__title .dashicons {
+	font-size: 28px;
+	width: 28px;
+	height: 28px;
+	color: var(--gwp-primary);
+}
+
+.gwp-admin-header__version {
+	display: inline-block;
+	padding: 2px 8px;
+	background: var(--gwp-gray-100);
+	color: var(--gwp-gray-600);
+	font-size: 12px;
+	font-weight: 500;
+	border-radius: 12px;
+	margin-left: 8px;
+}
+
+.gwp-admin-header__actions {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+/* ==========================================================================
+   Tabs
+   ========================================================================== */
+
+.gwp-tabs {
+	display: flex;
+	gap: 4px;
+	margin-bottom: 24px;
+	border-bottom: 1px solid var(--gwp-border);
+}
+
+.gwp-tab {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 12px 20px;
+	background: transparent;
+	border: none;
+	border-bottom: 3px solid transparent;
+	color: var(--gwp-gray-700);
+	font-size: 14px;
+	font-weight: 500;
+	cursor: pointer;
+	text-decoration: none;
+	transition: var(--gwp-transition);
+	margin-bottom: -1px;
+}
+
+.gwp-tab:hover {
+	color: var(--gwp-primary);
+	background: var(--gwp-gray-50);
+}
+
+.gwp-tab.is-active {
+	color: var(--gwp-primary);
+	border-bottom-color: var(--gwp-primary);
+	font-weight: 600;
+}
+
+.gwp-tab .dashicons {
+	font-size: 18px;
+	width: 18px;
+	height: 18px;
+}
+
+.gwp-tab__badge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 20px;
+	height: 20px;
+	padding: 0 6px;
+	background: var(--gwp-gray-200);
+	color: var(--gwp-gray-700);
+	font-size: 11px;
+	font-weight: 600;
+	border-radius: 10px;
+}
+
+.gwp-tab.is-active .gwp-tab__badge {
+	background: var(--gwp-primary);
+	color: #fff;
+}
+
+.gwp-tab-panel {
+	display: none;
+	animation: gwpFadeIn 0.2s ease;
+}
+
+.gwp-tab-panel.is-active {
+	display: block;
+}
+
+@keyframes gwpFadeIn {
+	from {
+		opacity: 0;
+		transform: translateY(4px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* ==========================================================================
+   Cards
+   ========================================================================== */
+
+.gwp-card {
+	background: #fff;
+	border: 1px solid var(--gwp-border);
+	border-radius: var(--gwp-radius);
+	box-shadow: var(--gwp-shadow-sm);
+	overflow: hidden;
+	transition: var(--gwp-transition);
+}
+
+.gwp-card + .gwp-card {
+	margin-top: 16px;
+}
+
+.gwp-card__header {
+	padding: 16px 20px;
+	border-bottom: 1px solid var(--gwp-border);
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.gwp-card__title {
+	margin: 0;
+	font-size: 16px;
+	font-weight: 600;
+	color: var(--gwp-gray-900);
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.gwp-card__title .dashicons {
+	color: var(--gwp-primary);
+}
+
+.gwp-card__body {
+	padding: 20px;
+}
+
+.gwp-card__subtitle {
+	margin: 0 0 16px;
+	color: var(--gwp-gray-600);
+	font-size: 13px;
+}
+
+/* ==========================================================================
+   Form elements
+   ========================================================================== */
+
+.gwp-form-row {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin-bottom: 20px;
+}
+
+.gwp-form-row label {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--gwp-gray-800);
+}
+
+.gwp-form-row .description {
+	color: var(--gwp-gray-600);
+	font-size: 13px;
+	font-style: normal;
+	margin: 0;
+}
+
+.gwp-input {
+	width: 100%;
+	max-width: 500px;
+	padding: 10px 14px;
+	font-size: 14px;
+	font-family: monospace;
+	border: 1px solid var(--gwp-gray-300);
+	border-radius: var(--gwp-radius-sm);
+	background: #fff;
+	transition: var(--gwp-transition);
+}
+
+.gwp-input:focus {
+	outline: none;
+	border-color: var(--gwp-primary);
+	box-shadow: 0 0 0 3px rgba(34, 113, 177, 0.15);
+}
+
+.gwp-input.is-valid {
+	border-color: var(--gwp-success);
+	background: #f6fbf8;
+}
+
+.gwp-input.is-invalid {
+	border-color: var(--gwp-danger);
+	background: #fef6f6;
+}
+
+/* ==========================================================================
+   License status bar (top of Hub page)
+   ========================================================================== */
+
+.gwp-status-bar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 16px 20px;
+	background: #fff;
+	border: 1px solid var(--gwp-border);
+	border-left: 4px solid var(--gwp-gray-400);
+	border-radius: var(--gwp-radius);
+	box-shadow: var(--gwp-shadow-sm);
+	margin-bottom: 24px;
+}
+
+.gwp-status-bar.is-valid {
+	border-left-color: var(--gwp-success);
+	background: linear-gradient(to right, #f6fbf8 0%, #fff 40%);
+}
+
+.gwp-status-bar.is-invalid {
+	border-left-color: var(--gwp-danger);
+	background: linear-gradient(to right, #fef6f6 0%, #fff 40%);
+}
+
+.gwp-status-bar.is-warning {
+	border-left-color: var(--gwp-warning);
+	background: linear-gradient(to right, #fffbf0 0%, #fff 40%);
+}
+
+.gwp-status-bar__left {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	flex: 1;
+	min-width: 0;
+}
+
+.gwp-status-bar__icon {
+	flex-shrink: 0;
+	width: 44px;
+	height: 44px;
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--gwp-gray-100);
+}
+
+.gwp-status-bar.is-valid .gwp-status-bar__icon {
+	background: #e8f7ee;
+}
+
+.gwp-status-bar.is-invalid .gwp-status-bar__icon {
+	background: #fce8e8;
+}
+
+.gwp-status-bar.is-warning .gwp-status-bar__icon {
+	background: #fef4e0;
+}
+
+.gwp-status-bar__icon .dashicons {
+	font-size: 24px;
+	width: 24px;
+	height: 24px;
+	color: var(--gwp-gray-600);
+}
+
+.gwp-status-bar.is-valid .gwp-status-bar__icon .dashicons {
+	color: var(--gwp-success);
+}
+
+.gwp-status-bar.is-invalid .gwp-status-bar__icon .dashicons {
+	color: var(--gwp-danger);
+}
+
+.gwp-status-bar.is-warning .gwp-status-bar__icon .dashicons {
+	color: var(--gwp-warning);
+}
+
+.gwp-status-bar__content {
+	flex: 1;
+	min-width: 0;
+}
+
+.gwp-status-bar__title {
+	margin: 0 0 4px;
+	font-size: 15px;
+	font-weight: 600;
+	color: var(--gwp-gray-900);
+}
+
+.gwp-status-bar__meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16px;
+	color: var(--gwp-gray-600);
+	font-size: 13px;
+}
+
+.gwp-status-bar__meta-item {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.gwp-status-bar__right {
+	flex-shrink: 0;
+	text-align: right;
+	font-size: 12px;
+	color: var(--gwp-gray-500);
+}
+
+.gwp-refresh-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	color: var(--gwp-primary);
+	text-decoration: none;
+	font-weight: 500;
+}
+
+.gwp-refresh-link:hover {
+	color: var(--gwp-primary-dark);
+	text-decoration: underline;
+}
+
+.gwp-refresh-link .dashicons {
+	font-size: 14px;
+	width: 14px;
+	height: 14px;
+}
+
+/* ==========================================================================
+   Plan badges
+   ========================================================================== */
+
+.gwp-plan-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 12px;
+	border-radius: 20px;
+	font-size: 12px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.3px;
+	color: #fff;
+	line-height: 1;
+}
+
+.gwp-plan-badge .dashicons {
+	font-size: 14px;
+	width: 14px;
+	height: 14px;
+}
+
+.gwp-plan-badge--agency {
+	background: var(--gwp-purple);
+}
+
+.gwp-plan-badge--all_access {
+	background: var(--gwp-success);
+}
+
+.gwp-plan-badge--list_addons {
+	background: var(--gwp-info);
+}
+
+.gwp-plan-badge--single_addon {
+	background: var(--gwp-warning);
+}
+
+.gwp-plan-badge--unknown {
+	background: var(--gwp-gray-500);
+}
+
+/* ==========================================================================
+   Plugin grid & cards
+   ========================================================================== */
+
+.gwp-section-title {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin: 32px 0 16px;
+	font-size: 18px;
+	font-weight: 600;
+	color: var(--gwp-gray-900);
+}
+
+.gwp-section-title .dashicons {
+	font-size: 22px;
+	width: 22px;
+	height: 22px;
+}
+
+.gwp-section-title.is-unlocked .dashicons {
+	color: var(--gwp-success);
+}
+
+.gwp-section-title.is-locked .dashicons {
+	color: var(--gwp-gray-500);
+}
+
+.gwp-section-title__count {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 24px;
+	height: 24px;
+	padding: 0 8px;
+	background: var(--gwp-gray-100);
+	color: var(--gwp-gray-700);
+	font-size: 12px;
+	font-weight: 600;
+	border-radius: 12px;
+}
+
+.gwp-plugin-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+	gap: 16px;
+}
+
+.gwp-plugin-card {
+	background: #fff;
+	border: 1px solid var(--gwp-border);
+	border-radius: var(--gwp-radius);
+	overflow: hidden;
+	transition: var(--gwp-transition);
+	display: flex;
+	flex-direction: column;
+}
+
+.gwp-plugin-card:hover {
+	box-shadow: var(--gwp-shadow-md);
+	transform: translateY(-1px);
+}
+
+.gwp-plugin-card.is-locked {
+	opacity: 0.85;
+}
+
+.gwp-plugin-card.is-locked:hover {
+	opacity: 1;
+}
+
+.gwp-plugin-card__header {
+	padding: 16px;
+	display: flex;
+	gap: 12px;
+	flex: 1;
+}
+
+.gwp-plugin-card__icon {
+	flex-shrink: 0;
+	width: 64px;
+	height: 64px;
+	border-radius: var(--gwp-radius-sm);
+	background: var(--gwp-gray-100);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+}
+
+.gwp-plugin-card__icon img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.gwp-plugin-card__icon .dashicons {
+	font-size: 32px;
+	width: 32px;
+	height: 32px;
+	color: var(--gwp-gray-400);
+}
+
+.gwp-plugin-card__content {
+	flex: 1;
+	min-width: 0;
+}
+
+.gwp-plugin-card__name {
+	margin: 0 0 4px;
+	font-size: 15px;
+	font-weight: 600;
+	color: var(--gwp-gray-900);
+	line-height: 1.3;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+}
+
+.gwp-plugin-card__meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-bottom: 8px;
+}
+
+.gwp-plugin-card__version {
+	display: inline-flex;
+	align-items: center;
+	padding: 2px 8px;
+	background: var(--gwp-gray-100);
+	color: var(--gwp-gray-700);
+	font-size: 11px;
+	font-weight: 500;
+	border-radius: 4px;
+	font-family: monospace;
+}
+
+.gwp-plugin-card__source-badge {
+	display: inline-flex;
+	align-items: center;
+	padding: 2px 8px;
+	color: #fff;
+	font-size: 10px;
+	font-weight: 600;
+	border-radius: 4px;
+	text-transform: uppercase;
+	letter-spacing: 0.3px;
+}
+
+.gwp-plugin-card__source-badge--global {
+	background: var(--gwp-success);
+}
+
+.gwp-plugin-card__source-badge--per_plugin {
+	background: var(--gwp-warning);
+}
+
+.gwp-plugin-card__update-notice {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 2px 8px;
+	background: #fff4e5;
+	color: #b8610b;
+	font-size: 11px;
+	font-weight: 600;
+	border-radius: 4px;
+}
+
+.gwp-plugin-card__update-notice .dashicons {
+	font-size: 12px;
+	width: 12px;
+	height: 12px;
+}
+
+.gwp-plugin-card__description {
+	margin: 0;
+	font-size: 12px;
+	color: var(--gwp-gray-600);
+	line-height: 1.5;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+}
+
+.gwp-plugin-card__footer {
+	padding: 12px 16px;
+	background: var(--gwp-gray-50);
+	border-top: 1px solid var(--gwp-border);
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+.gwp-plugin-card__status {
+	font-size: 12px;
+	color: var(--gwp-gray-600);
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.gwp-plugin-card__status .dashicons {
+	font-size: 14px;
+	width: 14px;
+	height: 14px;
+}
+
+.gwp-plugin-card__status.is-up-to-date {
+	color: var(--gwp-success);
+}
+
+/* ==========================================================================
+   Per-plugin keys table
+   ========================================================================== */
+
+.gwp-keys-table {
+	width: 100%;
+	border-collapse: separate;
+	border-spacing: 0;
+	background: #fff;
+	border: 1px solid var(--gwp-border);
+	border-radius: var(--gwp-radius);
+	overflow: hidden;
+}
+
+.gwp-keys-table thead {
+	background: var(--gwp-gray-50);
+}
+
+.gwp-keys-table th,
+.gwp-keys-table td {
+	padding: 12px 16px;
+	text-align: left;
+	border-bottom: 1px solid var(--gwp-border);
+}
+
+.gwp-keys-table tbody tr:last-child td {
+	border-bottom: none;
+}
+
+.gwp-keys-table th {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--gwp-gray-700);
+	text-transform: uppercase;
+	letter-spacing: 0.3px;
+}
+
+.gwp-keys-table tbody tr:hover {
+	background: var(--gwp-gray-50);
+}
+
+.gwp-keys-table__plugin {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.gwp-keys-table__icon {
+	flex-shrink: 0;
+	width: 36px;
+	height: 36px;
+	border-radius: var(--gwp-radius-sm);
+	background: var(--gwp-gray-100);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+}
+
+.gwp-keys-table__icon img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.gwp-keys-table__plugin-name {
+	font-weight: 500;
+	color: var(--gwp-gray-900);
+}
+
+.gwp-keys-table__status {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 12px;
+}
+
+.gwp-keys-table__status .dashicons {
+	font-size: 16px;
+	width: 16px;
+	height: 16px;
+}
+
+.gwp-keys-table__status.is-valid {
+	color: var(--gwp-success);
+}
+
+.gwp-keys-table__status.is-invalid {
+	color: var(--gwp-danger);
+}
+
+.gwp-keys-table__status.is-empty {
+	color: var(--gwp-gray-500);
+}
+
+/* ==========================================================================
+   Info boxes / overview
+   ========================================================================== */
+
+.gwp-info-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	gap: 16px;
+	margin-bottom: 24px;
+}
+
+.gwp-info-box {
+	background: #fff;
+	border: 1px solid var(--gwp-border);
+	border-radius: var(--gwp-radius);
+	padding: 20px;
+	box-shadow: var(--gwp-shadow-sm);
+}
+
+.gwp-info-box__label {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--gwp-gray-600);
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	margin: 0 0 8px;
+}
+
+.gwp-info-box__value {
+	font-size: 28px;
+	font-weight: 700;
+	color: var(--gwp-gray-900);
+	margin: 0;
+	line-height: 1.2;
+}
+
+.gwp-info-box__sub {
+	font-size: 13px;
+	color: var(--gwp-gray-600);
+	margin: 4px 0 0;
+}
+
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
+
+.gwp-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	padding: 8px 14px;
+	font-size: 13px;
+	font-weight: 500;
+	line-height: 1;
+	border-radius: var(--gwp-radius-sm);
+	border: 1px solid transparent;
+	cursor: pointer;
+	text-decoration: none;
+	transition: var(--gwp-transition);
+	white-space: nowrap;
+}
+
+.gwp-btn .dashicons {
+	font-size: 16px;
+	width: 16px;
+	height: 16px;
+}
+
+.gwp-btn--primary {
+	background: var(--gwp-primary);
+	color: #fff;
+	border-color: var(--gwp-primary);
+}
+
+.gwp-btn--primary:hover {
+	background: var(--gwp-primary-dark);
+	border-color: var(--gwp-primary-dark);
+	color: #fff;
+}
+
+.gwp-btn--secondary {
+	background: #fff;
+	color: var(--gwp-gray-800);
+	border-color: var(--gwp-gray-300);
+}
+
+.gwp-btn--secondary:hover {
+	background: var(--gwp-gray-50);
+	border-color: var(--gwp-gray-400);
+	color: var(--gwp-gray-900);
+}
+
+.gwp-btn--success {
+	background: var(--gwp-success);
+	color: #fff;
+	border-color: var(--gwp-success);
+}
+
+.gwp-btn--success:hover {
+	background: #229c56;
+	color: #fff;
+}
+
+.gwp-btn--sm {
+	padding: 6px 10px;
+	font-size: 12px;
+}
+
+/* ==========================================================================
+   Error / alert boxes
+   ========================================================================== */
+
+.gwp-alert {
+	padding: 14px 18px;
+	border-radius: var(--gwp-radius);
+	margin: 16px 0;
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	border: 1px solid;
+}
+
+.gwp-alert .dashicons {
+	flex-shrink: 0;
+	font-size: 20px;
+	width: 20px;
+	height: 20px;
+}
+
+.gwp-alert__content {
+	flex: 1;
+}
+
+.gwp-alert__title {
+	font-weight: 600;
+	margin: 0 0 4px;
+}
+
+.gwp-alert__text {
+	margin: 0;
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+.gwp-alert--success {
+	background: #e8f7ee;
+	border-color: var(--gwp-success);
+	color: #1e7e42;
+}
+
+.gwp-alert--warning {
+	background: #fef4e0;
+	border-color: var(--gwp-warning);
+	color: #9a5d0a;
+}
+
+.gwp-alert--danger {
+	background: #fce8e8;
+	border-color: var(--gwp-danger);
+	color: #9e1b1b;
+}
+
+.gwp-alert--info {
+	background: #e7f3fa;
+	border-color: var(--gwp-info);
+	color: #1d6694;
+}
+
+/* ==========================================================================
+   Empty state
+   ========================================================================== */
+
+.gwp-empty-state {
+	text-align: center;
+	padding: 60px 20px;
+	color: var(--gwp-gray-600);
+}
+
+.gwp-empty-state .dashicons {
+	font-size: 56px;
+	width: 56px;
+	height: 56px;
+	color: var(--gwp-gray-300);
+	margin-bottom: 16px;
+}
+
+.gwp-empty-state__title {
+	margin: 0 0 8px;
+	font-size: 18px;
+	font-weight: 600;
+	color: var(--gwp-gray-800);
+}
+
+.gwp-empty-state__text {
+	margin: 0 0 16px;
+	font-size: 14px;
+}
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+
+@media (max-width: 782px) {
+	.gwp-status-bar {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+
+	.gwp-status-bar__right {
+		text-align: left;
+		width: 100%;
+	}
+
+	.gwp-tabs {
+		overflow-x: auto;
+		flex-wrap: nowrap;
+	}
+
+	.gwp-tab {
+		white-space: nowrap;
+	}
+
+	.gwp-plugin-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.gwp-info-grid {
+		grid-template-columns: 1fr 1fr;
+	}
+}
