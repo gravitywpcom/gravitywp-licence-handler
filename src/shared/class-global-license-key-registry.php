@@ -137,8 +137,8 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 				return;
 			}
 
-			$css_path = self::$base_dir . '/assets/css/gwp-admin.css';
-			$js_path  = self::$base_dir . '/assets/js/gwp-admin.js';
+			$css_path = self::$base_dir . '/assets/css/gwp-admin.min.css';
+			$js_path  = self::$base_dir . '/assets/js/gwp-admin.min.js';
 
 			$css_url = self::resolve_asset_url( $css_path );
 			$js_url  = self::resolve_asset_url( $js_path );
