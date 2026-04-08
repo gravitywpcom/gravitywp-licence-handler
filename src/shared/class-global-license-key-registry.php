@@ -56,24 +56,55 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 			self::$version  = $version;
 			self::$base_dir = $base_dir ? $base_dir : __DIR__;
 
-			add_action( 'admin_menu', array( self::class, 'add_admin_menu' ) );
+			// Priority 98 ensures Gravity Forms (priority 9) has registered its menu,
+			// and runs before Hub_Page (priority 99) so the parent menu exists.
+			add_action( 'admin_menu', array( self::class, 'add_admin_menu' ), 98 );
 			add_action( 'admin_init', array( self::class, 'register_settings' ) );
 			add_action( 'admin_enqueue_scripts', array( self::class, 'enqueue_assets' ) );
 		}
 
 		/**
-		 * Add the settings page under Gravity Forms menu.
+		 * Register the GravityWP Settings admin page.
+		 *
+		 * Adds as a submenu under Gravity Forms when available; otherwise creates
+		 * a top-level menu. This ensures the page is always accessible regardless
+		 * of whether Gravity Forms is installed.
 		 *
 		 * @return void
 		 */
 		public static function add_admin_menu() {
-			add_submenu_page(
-				'gf_edit_forms',
-				__( 'GravityWP Settings', 'gravitywp-license-handler' ),
-				'GravityWP',
-				'manage_options',
-				'gravitywp-settings',
-				array( self::class, 'render_settings_page' )
+			$page_title = __( 'GravityWP Settings', 'gravitywp-license-handler' );
+			$menu_title = 'GravityWP';
+			$capability = 'manage_options';
+			$menu_slug  = 'gravitywp-settings';
+			$callback   = array( self::class, 'render_settings_page' );
+
+			// Detect if Gravity Forms is loaded and accessible.
+			global $admin_page_hooks;
+			$gf_active = ( isset( $admin_page_hooks['gf_edit_forms'] ) || class_exists( '\GFForms' ) );
+
+			if ( $gf_active && current_user_can( 'gform_full_access' ) ) {
+				// Preferred: nest under Gravity Forms menu.
+				add_submenu_page(
+					'gf_edit_forms',
+					$page_title,
+					$menu_title,
+					$capability,
+					$menu_slug,
+					$callback
+				);
+				return;
+			}
+
+			// Fallback: create a top-level menu.
+			add_menu_page(
+				$page_title,
+				$menu_title,
+				$capability,
+				$menu_slug,
+				$callback,
+				'dashicons-admin-generic',
+				81
 			);
 		}
 

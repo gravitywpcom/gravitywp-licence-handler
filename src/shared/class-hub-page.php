@@ -27,22 +27,79 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Page' ) ) {
 		 * @return void
 		 */
 		public static function init() {
-			add_action( 'admin_menu', array( self::class, 'add_admin_menu' ), 11 );
+			// Priority 99 ensures Gravity Forms (priority 9) has registered its menu first.
+			add_action( 'admin_menu', array( self::class, 'add_admin_menu' ), 99 );
 		}
 
 		/**
-		 * Add Hub submenu page under Gravity Forms.
+		 * Register the GravityWP Hub admin page.
+		 *
+		 * Adds as a submenu under Gravity Forms when available; otherwise falls back to
+		 * a top-level menu. This ensures the page is accessible regardless of whether
+		 * Gravity Forms is installed.
 		 *
 		 * @return void
 		 */
 		public static function add_admin_menu() {
+			$page_title = __( 'GravityWP Hub', 'gravitywp-license-handler' );
+			$menu_title = 'GravityWP Hub';
+			$capability = 'manage_options';
+			$menu_slug  = 'gravitywp-hub';
+			$callback   = array( self::class, 'render_page' );
+
+			// Detect if Gravity Forms is loaded and accessible.
+			global $admin_page_hooks;
+			$gf_active = ( isset( $admin_page_hooks['gf_edit_forms'] ) || class_exists( '\GFForms' ) );
+
+			if ( $gf_active && current_user_can( 'gform_full_access' ) ) {
+				// Preferred: nest under Gravity Forms.
+				add_submenu_page(
+					'gf_edit_forms',
+					$page_title,
+					$menu_title,
+					$capability,
+					$menu_slug,
+					$callback
+				);
+				return;
+			}
+
+			// Fallback: ensure GravityWP top-level menu exists, then add as submenu.
+			self::ensure_top_level_menu();
 			add_submenu_page(
-				'gf_edit_forms',
-				__( 'GravityWP Hub', 'gravitywp-license-handler' ),
-				'GravityWP Hub',
+				'gravitywp-settings',
+				$page_title,
+				__( 'Hub', 'gravitywp-license-handler' ),
+				$capability,
+				$menu_slug,
+				$callback
+			);
+		}
+
+		/**
+		 * Ensure the GravityWP top-level menu exists.
+		 *
+		 * Safe to call multiple times — only registers if not already present.
+		 *
+		 * @return void
+		 */
+		private static function ensure_top_level_menu() {
+			global $admin_page_hooks;
+
+			if ( isset( $admin_page_hooks['gravitywp-settings'] ) ) {
+				return; // Already registered (probably by Registry).
+			}
+
+			add_menu_page(
+				__( 'GravityWP', 'gravitywp-license-handler' ),
+				'GravityWP',
 				'manage_options',
-				'gravitywp-hub',
-				array( self::class, 'render_page' )
+				'gravitywp-settings',
+				class_exists( '\GravityWP\Shared\Global_License_Key_Registry' )
+					? array( '\GravityWP\Shared\Global_License_Key_Registry', 'render_settings_page' )
+					: '__return_null',
+				'dashicons-admin-generic',
+				81
 			);
 		}
 
