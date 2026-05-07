@@ -769,11 +769,14 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 									$name         = $plugin['name'] ?? $slug;
 									$current_key  = $plugin_keys[ $slug ] ?? '';
 									$license_data = $per_plugin_info[ $slug ] ?? null;
+									$has_access   = ! empty( $plugin['has_access'] );
+									$access_src   = $plugin['access_source'] ?? 'none';
 									$status_class = 'is-empty';
 									$status_text  = __( 'Not set', 'gravitywp-license-handler' );
 									$status_icon  = 'dashicons-minus';
 
 									if ( ! empty( $current_key ) ) {
+										// Has an individual key set — check if it's valid.
 										if ( $license_data && ( $license_data['status'] ?? '' ) === 'valid' ) {
 											$status_class = 'is-valid';
 											$status_text  = __( 'Active', 'gravitywp-license-handler' );
@@ -783,6 +786,11 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 											$status_text  = __( 'Invalid', 'gravitywp-license-handler' );
 											$status_icon  = 'dashicons-warning';
 										}
+									} elseif ( $has_access && 'global' === $access_src ) {
+										// No individual key, but covered by the Global License Key.
+										$status_class = 'is-valid';
+										$status_text  = __( 'Via Global', 'gravitywp-license-handler' );
+										$status_icon  = 'dashicons-admin-network';
 									}
 
 									$icon = '';

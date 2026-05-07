@@ -480,23 +480,38 @@ class LicenseHandler {
 	public function plugin_settings_license_fields() {
 		$slug                = $this->_addon_slug;
 		$global_settings_url = admin_url( 'admin.php?page=gravitywp' );
-		$hub_url             = $global_settings_url; // Single page now.
 
 		$license_field = array(
-			'title'  => esc_html__( 'License Status', 'gravitywp-license-handler' ),
+			'title'  => esc_html__( 'License', 'gravitywp-license-handler' ),
 			'fields' => array(
+				// Keep the original key input field — fully functional.
+				// This preserves backward compatibility: users can still enter/view
+				// their key here. The key is also picked up by resolve_license_key_for_addon()
+				// and auto-migrated to the centralized storage on next hub request.
+				array(
+					'name'                => $slug . '_license_key',
+					'tooltip'             => esc_html__( 'Enter the license key you received after purchasing the plugin.', 'gravitywp-license-handler' ),
+					'label'               => esc_html__( 'License Key', 'gravitywp-license-handler' ),
+					'type'                => 'text',
+					'input_type'          => 'password',
+					'class'               => 'medium',
+					'default_value'       => '',
+					'validation_callback' => array( $this, 'license_validation' ),
+					'feedback_callback'   => array( $this, 'license_feedback' ),
+					'error_message'       => esc_html__( 'Invalid or expired license', 'gravitywp-license-handler' ),
+				),
+				// Status display below the key field — shows access source + link to hub.
 				array(
 					'name' => 'license_status_info',
 					'type' => 'html',
-					'html' => function () use ( $slug, $global_settings_url, $hub_url ) {
-						$settings_link = '<a href="' . esc_url( $global_settings_url ) . '">' . esc_html__( 'GravityWP', 'gravitywp-license-handler' ) . '</a>';
-						$hub_link      = $settings_link; // Same page.
+					'html' => function () use ( $slug, $global_settings_url ) {
+						$settings_link = '<a href="' . esc_url( $global_settings_url ) . '">' . esc_html__( 'GravityWP Settings', 'gravitywp-license-handler' ) . '</a>';
 
 						$global_key  = get_option( 'gravitywp_global_license_key', '' );
 						$plugin_keys = get_option( 'gravitywp_plugin_license_keys', array() );
 						$has_own_key = is_array( $plugin_keys ) && ! empty( $plugin_keys[ $slug ] );
 
-						// Use Hub_Manager for access check if available.
+						// Check access via Hub_Manager.
 						$has_access    = false;
 						$access_source = 'none';
 						if ( class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
@@ -504,45 +519,30 @@ class LicenseHandler {
 							$access_source = \GravityWP\Shared\Hub_Manager::get_access_source( $slug );
 						}
 
-						// No keys at all.
-						if ( empty( $global_key ) && ! $has_own_key ) {
+						if ( $has_access && 'global' === $access_source ) {
 							$message = sprintf(
-								/* translators: %s: link to settings */
-								esc_html__( 'No license key found. Enter a Global License Key (for All Access / Agency plans) or an Individual Key (for Single Add-ons) in %s.', 'gravitywp-license-handler' ),
+								/* translators: %s: settings link */
+								esc_html__( 'This plugin is covered by your Global License Key. You can also manage all licenses from %s.', 'gravitywp-license-handler' ),
 								$settings_link
 							);
-							return self::render_status_html( $message, 'warning' );
-						}
-
-						// Access granted.
-						if ( $has_access ) {
-							if ( 'global' === $access_source ) {
-								$message = sprintf(
-									/* translators: %s: settings link */
-									esc_html__( 'Active via Global License Key. Manage your license in %s.', 'gravitywp-license-handler' ),
-									$settings_link
-								);
-							} elseif ( 'per_plugin' === $access_source ) {
-								$message = sprintf(
-									/* translators: %s: settings link */
-									esc_html__( 'Active via Individual Plugin Key. Manage your keys in %s.', 'gravitywp-license-handler' ),
-									$settings_link
-								);
-							} else {
-								$message = esc_html__( 'License active for this plugin.', 'gravitywp-license-handler' );
-							}
 							return self::render_status_html( $message, 'success' );
 						}
 
-						// Key(s) exist but no access for this plugin.
+						if ( $has_access ) {
+							$message = sprintf(
+								/* translators: %s: settings link */
+								esc_html__( 'License active. Manage all licenses from %s.', 'gravitywp-license-handler' ),
+								$settings_link
+							);
+							return self::render_status_html( $message, 'success' );
+						}
+
 						$message = sprintf(
-							/* translators: %1$s: settings link, %2$s: hub link, %3$s: pricing link */
-							esc_html__( 'Your current license does not cover this plugin. Check %1$s, view the full catalog at %2$s, or upgrade your plan on %3$s.', 'gravitywp-license-handler' ),
-							$settings_link,
-							$hub_link,
-							'<a href="https://gravitywp.com/pricing/" target="_blank" rel="noopener">gravitywp.com</a>'
+							/* translators: %s: settings link */
+							esc_html__( 'Manage all your GravityWP licenses from %s.', 'gravitywp-license-handler' ),
+							$settings_link
 						);
-						return self::render_status_html( $message, 'danger' );
+						return self::render_status_html( $message, 'warning' );
 					},
 				),
 			),
@@ -588,8 +588,16 @@ class LicenseHandler {
 	 * @param string $field_setting The submitted value.
 	 */
 	public function license_validation( $field, $field_setting ) {
-		// No-op: Per-plugin license keys are no longer supported.
-		// All license management is done via the Global License Key in GravityWP Settings.
+		if ( empty( $field_setting ) ) {
+			return;
+		}
+
+		// When a key is entered here, auto-migrate it to the centralized storage
+		// so it's picked up by the Hub on the next request.
+		$this->auto_migrate_discovered_key( $field_setting );
+
+		// Re-initialize the client with the new key.
+		$this->initialize_paddlepress_client( $field_setting );
 	}
 
 	/**

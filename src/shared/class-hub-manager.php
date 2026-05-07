@@ -30,7 +30,7 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
 		 *
 		 * @var string
 		 */
-		private static $hub_api_url = 'https://my.gravitywp.com/wp-json/paddlepress-api/v1/hub';
+		private static $hub_api_url = 'https://stg-mygravitywpcom-mygwpstage.kinsta.cloud/wp-json/paddlepress-api/v1/hub';
 
 		/**
 		 * Cache key in wp_options.
@@ -44,7 +44,7 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
 		 *
 		 * @var string
 		 */
-		const CACHE_VERSION = '2.1.0';
+		const CACHE_VERSION = '2.2.0';
 
 		/**
 		 * Cache TTL in seconds (12 hours).
@@ -479,42 +479,69 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
 		 * @return array [slug => license_key] of discovered legacy keys.
 		 */
 		private static function scan_legacy_addon_keys() {
-			if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Loader' ) ) {
-				return array();
-			}
-
-			$handlers = Global_License_Key_Loader::get_registered_license_handlers();
-			if ( empty( $handlers ) ) {
-				return array();
-			}
-
 			$keys = array();
 
-			foreach ( $handlers as $handler ) {
-				$addon_class = $handler['addon_class'] ?? '';
-				if ( empty( $addon_class ) || ! class_exists( $addon_class ) ) {
-					continue;
+			// Method 1: Scan via registered addon handlers (active plugins).
+			if ( class_exists( '\GravityWP\Shared\Global_License_Key_Loader' ) ) {
+				$handlers = Global_License_Key_Loader::get_registered_license_handlers();
+				foreach ( $handlers as $handler ) {
+					$addon_class = $handler['addon_class'] ?? '';
+					if ( empty( $addon_class ) || ! class_exists( $addon_class ) ) {
+						continue;
+					}
+
+					try {
+						$addon = $addon_class::get_instance();
+						if ( ! method_exists( $addon, 'get_slug' ) || ! method_exists( $addon, 'get_plugin_setting' ) ) {
+							continue;
+						}
+
+						$slug = $addon->get_slug();
+						if ( empty( $slug ) ) {
+							continue;
+						}
+
+						$legacy_key = $addon->get_plugin_setting( $slug . '_license_key' );
+						if ( ! empty( $legacy_key ) && is_string( $legacy_key ) ) {
+							$keys[ $slug ] = trim( $legacy_key );
+						}
+					} catch ( \Exception $e ) {
+						continue;
+					}
 				}
+			}
 
-				try {
-					$addon = $addon_class::get_instance();
-					if ( ! method_exists( $addon, 'get_slug' ) || ! method_exists( $addon, 'get_plugin_setting' ) ) {
+			// Method 2: Direct DB scan for GF addon settings.
+			// Catches keys from plugins that are inactive or haven't registered yet.
+			// GF stores addon settings in: gravityformsaddon_{slug}_settings
+			global $wpdb;
+			$gf_options = $wpdb->get_results(
+				"SELECT option_name, option_value FROM {$wpdb->options}
+				 WHERE option_name LIKE 'gravityformsaddon_gravitywp%_settings'",
+				ARRAY_A
+			);
+
+			if ( ! empty( $gf_options ) ) {
+				foreach ( $gf_options as $row ) {
+					$settings = maybe_unserialize( $row['option_value'] );
+					if ( ! is_array( $settings ) ) {
 						continue;
 					}
 
-					$slug = $addon->get_slug();
-					if ( empty( $slug ) ) {
+					// Extract slug from option_name: gravityformsaddon_{slug}_settings
+					$slug = preg_replace( '/^gravityformsaddon_(.+)_settings$/', '$1', $row['option_name'] );
+					if ( empty( $slug ) || $slug === $row['option_name'] ) {
 						continue;
 					}
 
-					// Read legacy key: {slug}_license_key from GF addon settings.
-					$legacy_key = $addon->get_plugin_setting( $slug . '_license_key' );
-					if ( ! empty( $legacy_key ) && is_string( $legacy_key ) ) {
-						$keys[ $slug ] = trim( $legacy_key );
+					// Look for {slug}_license_key in the settings array.
+					$key_name = $slug . '_license_key';
+					if ( ! empty( $settings[ $key_name ] ) && is_string( $settings[ $key_name ] ) ) {
+						$legacy_key = trim( $settings[ $key_name ] );
+						if ( ! empty( $legacy_key ) && ! isset( $keys[ $slug ] ) ) {
+							$keys[ $slug ] = $legacy_key;
+						}
 					}
-				} catch ( \Exception $e ) {
-					// Silently skip — addon might not be fully initialized yet.
-					continue;
 				}
 			}
 

@@ -155,15 +155,32 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Page' ) ) {
 							</span>
 						<?php endif; ?>
 					<?php else : ?>
+						<?php
+						// Use purchase_url from catalog if available, else generic pricing page.
+						$purchase_url = ! empty( $plugin['purchase_url'] )
+							? $plugin['purchase_url']
+							: 'https://gravitywp.com/pricing/?utm_source=hub&utm_medium=admin&utm_campaign=upgrade&utm_content=' . rawurlencode( $slug );
+						$is_free = ! empty( $plugin['is_free'] );
+						?>
 						<a
-							href="https://gravitywp.com/pricing/?utm_source=hub&utm_medium=admin&utm_campaign=upgrade&utm_content=<?php echo esc_attr( $slug ); ?>"
+							href="<?php echo esc_url( $purchase_url ); ?>"
 							target="_blank"
 							rel="noopener"
 							class="gwp-btn gwp-btn--secondary gwp-btn--sm"
 						>
-							<span class="dashicons dashicons-lock"></span>
-							<?php esc_html_e( 'Upgrade to Access', 'gravitywp-license-handler' ); ?>
+							<?php if ( $is_free ) : ?>
+								<span class="dashicons dashicons-download"></span>
+								<?php esc_html_e( 'Get Free Plugin', 'gravitywp-license-handler' ); ?>
+							<?php else : ?>
+								<span class="dashicons dashicons-cart"></span>
+								<?php esc_html_e( 'Get This Add-on', 'gravitywp-license-handler' ); ?>
+							<?php endif; ?>
 						</a>
+						<?php if ( ! $is_free && ! empty( $plugin['price'] ) ) : ?>
+							<span class="gwp-plugin-card__status" style="color: #666;">
+								$<?php echo esc_html( number_format( (float) $plugin['price'], 0 ) ); ?>
+							</span>
+						<?php endif; ?>
 					<?php endif; ?>
 				</div>
 			</div>

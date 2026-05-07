@@ -1092,6 +1092,10 @@
 	color: var(--gwp-gray-500);
 }
 
+.gwp-keys-table__status.is-valid .dashicons-admin-network {
+	color: var(--gwp-primary);
+}
+
 /* ==========================================================================
    Info boxes / overview
    ========================================================================== */
