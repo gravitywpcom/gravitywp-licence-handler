@@ -13,9 +13,32 @@
 
 	document.addEventListener( 'DOMContentLoaded', function () {
 		initTabs();
+		initTabLinks();
 		initKeyValidation();
 		initRefreshButton();
 	} );
+
+	/**
+	 * Initialize cross-tab navigation links.
+	 *
+	 * Buttons with data-gwp-tab-link="<tab-key>" inside any tab panel
+	 * will switch to that tab when clicked.
+	 */
+	function initTabLinks() {
+		var links = document.querySelectorAll( '[data-gwp-tab-link]' );
+		links.forEach( function ( link ) {
+			link.addEventListener( 'click', function ( e ) {
+				e.preventDefault();
+				var targetKey = link.getAttribute( 'data-gwp-tab-link' );
+				var tab = document.querySelector(
+					'.gwp-tab[data-gwp-tab="' + targetKey + '"]'
+				);
+				if ( tab ) {
+					tab.click();
+				}
+			} );
+		} );
+	}
 
 	/**
 	 * Initialize the tabbed interface.

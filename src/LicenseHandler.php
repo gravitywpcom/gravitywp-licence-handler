@@ -313,23 +313,119 @@ class LicenseHandler {
 	/**
 	 * Resolve which license key to use for this specific addon.
 	 *
-	 * Since v2.1.0: Supports both global and per-plugin keys.
-	 * - If this addon has a per-plugin key set, use it
-	 * - Otherwise, use the global key
+	 * Resolution order:
+	 * 1. Per-plugin key in gravitywp_plugin_license_keys[slug] (v2.1.0 Individual Keys)
+	 * 2. Global key in gravitywp_global_license_key (v2.1.0 Global Key)
+	 * 3. Legacy per-plugin key from addon settings: {slug}_license_key (v2.0.x compat)
+	 *    → If found here, auto-migrates it to the appropriate new storage
+	 *
+	 * The 3rd source handles the case where a customer installed a plugin,
+	 * entered the key in the old per-plugin settings field, and hasn't
+	 * visited the new GravityWP page yet. The key is picked up automatically
+	 * and domain activation happens on the next hub request or gwp_is_valid() call.
 	 *
 	 * @since 2.1.0
 	 * @return string The license key to use (may be empty if neither is set).
 	 */
 	private function resolve_license_key_for_addon() {
-		// Check for per-plugin key first (Single Add-on scenario).
+		// 1. Check for per-plugin key (v2.1.0 Individual Keys).
 		$plugin_keys = get_option( 'gravitywp_plugin_license_keys', array() );
 		if ( is_array( $plugin_keys ) && ! empty( $plugin_keys[ $this->_addon_slug ] ) ) {
 			return (string) $plugin_keys[ $this->_addon_slug ];
 		}
 
-		// Fall back to global key.
+		// 2. Check for global key (v2.1.0 Global Key).
 		$this->_global_license_key = get_option( 'gravitywp_global_license_key', '' );
-		return (string) $this->_global_license_key;
+		if ( ! empty( $this->_global_license_key ) ) {
+			return (string) $this->_global_license_key;
+		}
+
+		// 3. Legacy: check old per-plugin key from Gravity Forms addon settings.
+		//    This covers customers who entered the key in the old plugin settings
+		//    page and haven't migrated yet. We read it, USE it, AND auto-migrate it
+		//    so the next request uses the new storage directly.
+		$legacy_key = $this->read_legacy_addon_key();
+		if ( ! empty( $legacy_key ) ) {
+			$this->auto_migrate_discovered_key( $legacy_key );
+			return (string) $legacy_key;
+		}
+
+		return '';
+	}
+
+	/**
+	 * Read a legacy per-plugin license key from the addon's GF settings.
+	 *
+	 * This is the old v2.0.x storage: addon settings['{slug}_license_key'].
+	 *
+	 * @since 2.1.0
+	 * @return string The legacy key, or empty string if not found.
+	 */
+	private function read_legacy_addon_key() {
+		if ( empty( $this->_addon_class ) ) {
+			return '';
+		}
+
+		try {
+			$addon = $this->_addon_class::get_instance();
+			if ( method_exists( $addon, 'get_plugin_setting' ) ) {
+				$key = $addon->get_plugin_setting( $this->_addon_slug . '_license_key' );
+				if ( ! empty( $key ) && is_string( $key ) ) {
+					return trim( $key );
+				}
+			}
+		} catch ( \Exception $e ) {
+			// Silently fail — addon might not be fully initialized yet.
+		}
+
+		return '';
+	}
+
+	/**
+	 * Auto-migrate a discovered legacy key to the new v2.1.0 storage.
+	 *
+	 * If no global key exists, promote the legacy key to global.
+	 * If a global key already exists, store as a per-plugin individual key.
+	 * Then clean up the old setting to prevent duplicate reads.
+	 *
+	 * @since 2.1.0
+	 * @param string $key The legacy key to migrate.
+	 * @return void
+	 */
+	private function auto_migrate_discovered_key( $key ) {
+		$current_global = get_option( 'gravitywp_global_license_key', '' );
+
+		if ( empty( $current_global ) ) {
+			// No global key → promote legacy key to global.
+			update_option( 'gravitywp_global_license_key', $key );
+		} else {
+			// Global key exists → store as individual plugin key (if different).
+			if ( $key !== $current_global ) {
+				$plugin_keys = get_option( 'gravitywp_plugin_license_keys', array() );
+				if ( ! is_array( $plugin_keys ) ) {
+					$plugin_keys = array();
+				}
+				if ( empty( $plugin_keys[ $this->_addon_slug ] ) ) {
+					$plugin_keys[ $this->_addon_slug ] = $key;
+					update_option( 'gravitywp_plugin_license_keys', $plugin_keys );
+				}
+			}
+		}
+
+		// Clean up the old setting.
+		try {
+			$addon    = $this->_addon_class::get_instance();
+			$settings = $addon->get_plugin_settings();
+			if ( is_array( $settings ) && isset( $settings[ $this->_addon_slug . '_license_key' ] ) ) {
+				unset( $settings[ $this->_addon_slug . '_license_key' ] );
+				$addon->update_plugin_settings( $settings );
+			}
+		} catch ( \Exception $e ) {
+			// Silently fail.
+		}
+
+		// Mark as migrated.
+		update_option( 'gravitywp_migrated_' . $this->_addon_slug, true, 'no' );
 	}
 
 	/**
@@ -343,8 +439,8 @@ class LicenseHandler {
 	 * @return void
 	 */
 	public function action_admin_notices() {
-		$global_settings_url = admin_url( 'admin.php?page=gravitywp-settings' );
-		$hub_url             = admin_url( 'admin.php?page=gravitywp-hub' );
+		$global_settings_url = admin_url( 'admin.php?page=gravitywp' );
+		$hub_url             = $global_settings_url; // Single page now.
 		$site_slug           = $this->_addon_class::get_instance()->gwp_site_slug;
 
 		if ( ! empty( $site_slug ) ) {
@@ -383,8 +479,8 @@ class LicenseHandler {
 	 */
 	public function plugin_settings_license_fields() {
 		$slug                = $this->_addon_slug;
-		$global_settings_url = admin_url( 'admin.php?page=gravitywp-settings' );
-		$hub_url             = admin_url( 'admin.php?page=gravitywp-hub' );
+		$global_settings_url = admin_url( 'admin.php?page=gravitywp' );
+		$hub_url             = $global_settings_url; // Single page now.
 
 		$license_field = array(
 			'title'  => esc_html__( 'License Status', 'gravitywp-license-handler' ),
@@ -393,8 +489,8 @@ class LicenseHandler {
 					'name' => 'license_status_info',
 					'type' => 'html',
 					'html' => function () use ( $slug, $global_settings_url, $hub_url ) {
-						$settings_link = '<a href="' . esc_url( $global_settings_url ) . '">' . esc_html__( 'GravityWP Settings', 'gravitywp-license-handler' ) . '</a>';
-						$hub_link      = '<a href="' . esc_url( $hub_url ) . '">' . esc_html__( 'GravityWP Hub', 'gravitywp-license-handler' ) . '</a>';
+						$settings_link = '<a href="' . esc_url( $global_settings_url ) . '">' . esc_html__( 'GravityWP', 'gravitywp-license-handler' ) . '</a>';
+						$hub_link      = $settings_link; // Same page.
 
 						$global_key  = get_option( 'gravitywp_global_license_key', '' );
 						$plugin_keys = get_option( 'gravitywp_plugin_license_keys', array() );

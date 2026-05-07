@@ -82,6 +82,11 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
 		 * @return array|false Hub data array or false on failure.
 		 */
 		public static function get_hub_data( $force_refresh = false ) {
+			// One-time: migrate any legacy keys found in old addon settings
+			// into the new gravitywp_plugin_license_keys storage so they
+			// show up in the UI AND get sent to the hub.
+			self::maybe_migrate_legacy_keys();
+
 			if ( ! $force_refresh ) {
 				$cached = self::get_cache();
 				if ( false !== $cached ) {
@@ -89,6 +94,82 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
 				}
 			}
 			return self::fetch_and_cache();
+		}
+
+		/**
+		 * Tracks whether legacy keys have been migrated this page load.
+		 *
+		 * @var bool
+		 */
+		private static $legacy_migrated = false;
+
+		/**
+		 * Migrate legacy per-plugin keys from old addon settings to new storage.
+		 *
+		 * Runs once per page load (on first call to get_hub_data). Scans ALL
+		 * registered addons' GF settings for `{slug}_license_key` and copies
+		 * any found keys into `gravitywp_plugin_license_keys` without overwriting
+		 * keys the user already set in the new UI.
+		 *
+		 * This covers the scenario where the key was ALREADY SAVED in the old
+		 * plugin settings (v2.0.x) before the v2.1.0 upgrade.
+		 *
+		 * @return void
+		 */
+		private static function maybe_migrate_legacy_keys() {
+			if ( self::$legacy_migrated ) {
+				return;
+			}
+			self::$legacy_migrated = true;
+
+			$legacy_keys = self::scan_legacy_addon_keys();
+			if ( empty( $legacy_keys ) ) {
+				return;
+			}
+
+			$current_keys = get_option( self::PLUGIN_KEYS_OPTION, array() );
+			if ( ! is_array( $current_keys ) ) {
+				$current_keys = array();
+			}
+
+			$changed       = false;
+			$global_key    = get_option( self::GLOBAL_KEY_OPTION, '' );
+			$first_key_set = false;
+
+			foreach ( $legacy_keys as $slug => $key ) {
+				// Don't overwrite keys the user already set in the new UI.
+				if ( ! empty( $current_keys[ $slug ] ) ) {
+					continue;
+				}
+
+				// If the legacy key is the same as the global key, skip it
+				// (already covered by global, no need to duplicate).
+				if ( ! empty( $global_key ) && $key === $global_key ) {
+					continue;
+				}
+
+				// If no global key exists and this is the first legacy key found,
+				// promote it to global (same as the original migration logic).
+				if ( empty( $global_key ) && ! $first_key_set ) {
+					update_option( self::GLOBAL_KEY_OPTION, $key );
+					$global_key    = $key;
+					$first_key_set = true;
+					$changed       = true;
+					continue;
+				}
+
+				// Store as individual plugin key.
+				$current_keys[ $slug ] = $key;
+				$changed               = true;
+			}
+
+			if ( $changed ) {
+				if ( ! empty( $current_keys ) ) {
+					update_option( self::PLUGIN_KEYS_OPTION, array_filter( $current_keys ) );
+				}
+				// Force cache refresh so the hub request includes the new keys.
+				delete_option( self::CACHE_KEY );
+			}
 		}
 
 		/**
@@ -133,6 +214,14 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
 			$plugin_license_keys = get_option( self::PLUGIN_KEYS_OPTION, array() );
 			if ( ! is_array( $plugin_license_keys ) ) {
 				$plugin_license_keys = array();
+			}
+
+			// Scan for legacy keys from old v2.0.x plugin settings.
+			// This catches keys entered in the per-plugin settings page that haven't
+			// been migrated yet. Legacy keys are merged UNDER the new keys (new wins).
+			$legacy_keys = self::scan_legacy_addon_keys();
+			if ( ! empty( $legacy_keys ) ) {
+				$plugin_license_keys = array_merge( $legacy_keys, $plugin_license_keys );
 			}
 
 			// Remove empty keys.
@@ -375,6 +464,61 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
 			}
 			$remaining = self::CACHE_TTL - ( time() - $cache['timestamp'] );
 			return max( 0, $remaining );
+		}
+
+		/**
+		 * Scan all registered GravityWP addons for legacy per-plugin license keys.
+		 *
+		 * In v2.0.x, each plugin stored its key in Gravity Forms addon settings as:
+		 *   {addon_slug}_license_key
+		 *
+		 * This method reads those keys so the Hub request can include them
+		 * even if the user never visited the new GravityWP settings page.
+		 * The keys get sent to the hub, which validates and activates the domain.
+		 *
+		 * @return array [slug => license_key] of discovered legacy keys.
+		 */
+		private static function scan_legacy_addon_keys() {
+			if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Loader' ) ) {
+				return array();
+			}
+
+			$handlers = Global_License_Key_Loader::get_registered_license_handlers();
+			if ( empty( $handlers ) ) {
+				return array();
+			}
+
+			$keys = array();
+
+			foreach ( $handlers as $handler ) {
+				$addon_class = $handler['addon_class'] ?? '';
+				if ( empty( $addon_class ) || ! class_exists( $addon_class ) ) {
+					continue;
+				}
+
+				try {
+					$addon = $addon_class::get_instance();
+					if ( ! method_exists( $addon, 'get_slug' ) || ! method_exists( $addon, 'get_plugin_setting' ) ) {
+						continue;
+					}
+
+					$slug = $addon->get_slug();
+					if ( empty( $slug ) ) {
+						continue;
+					}
+
+					// Read legacy key: {slug}_license_key from GF addon settings.
+					$legacy_key = $addon->get_plugin_setting( $slug . '_license_key' );
+					if ( ! empty( $legacy_key ) && is_string( $legacy_key ) ) {
+						$keys[ $slug ] = trim( $legacy_key );
+					}
+				} catch ( \Exception $e ) {
+					// Silently skip — addon might not be fully initialized yet.
+					continue;
+				}
+			}
+
+			return $keys;
 		}
 
 		/**

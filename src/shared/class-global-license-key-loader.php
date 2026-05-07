@@ -47,11 +47,14 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Loader' ) ) {
 		/**
 		 * Load the highest version of each shared component.
 		 *
-		 * Load order matters:
-		 * 1. Plan_Types (used by Registry, Hub_Manager, Hub_Page)
-		 * 2. Hub_Manager (used by Registry, Hub_Page)
-		 * 3. Registry (settings page)
-		 * 4. Hub_Page (catalog page)
+		 * Load order:
+		 * 1. Plan_Types (constants used by everything)
+		 * 2. Hub_Manager (cache; used by Registry)
+		 * 3. Hub_Page (plugin card render helpers; used by Registry)
+		 * 4. Registry (the unified GravityWP page — registers menu)
+		 *
+		 * Since v2.1.0, Hub_Page no longer registers its own menu. Both the
+		 * catalog and license keys live on a single page rendered by Registry.
 		 *
 		 * @return void
 		 */
@@ -71,31 +74,31 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Loader' ) ) {
 			$last     = self::$candidates[0];
 			$base_dir = dirname( $last['file'] );
 
-			// 1. Load Plan_Types first — dependency of others.
+			// 1. Plan_Types — constants/labels used by everything.
 			$plan_types_file = $base_dir . '/class-plan-types.php';
 			if ( file_exists( $plan_types_file ) ) {
 				require_once $plan_types_file;
 			}
 
-			// 2. Load Hub_Manager — dependency of Registry and Hub_Page.
+			// 2. Hub_Manager — cache layer used by Registry.
 			$hub_manager_file = $base_dir . '/class-hub-manager.php';
 			if ( file_exists( $hub_manager_file ) ) {
 				require_once $hub_manager_file;
 			}
 
-			// 3. Load Registry (settings page).
-			require_once $last['file'];
-			if ( class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
-				\GravityWP\Shared\Global_License_Key_Registry::init( $last['version'], $base_dir );
-			}
-
-			// 4. Load Hub_Page (catalog page).
+			// 3. Hub_Page — plugin card render helpers, called from Registry.
 			$hub_page_file = $base_dir . '/class-hub-page.php';
 			if ( file_exists( $hub_page_file ) ) {
 				require_once $hub_page_file;
 				if ( class_exists( '\GravityWP\Shared\Hub_Page' ) ) {
-					\GravityWP\Shared\Hub_Page::init();
+					\GravityWP\Shared\Hub_Page::init(); // No-op since v2.1.0.
 				}
+			}
+
+			// 4. Registry — the unified GravityWP page (registers menu, renders UI).
+			require_once $last['file'];
+			if ( class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
+				\GravityWP\Shared\Global_License_Key_Registry::init( $last['version'], $base_dir );
 			}
 		}
 

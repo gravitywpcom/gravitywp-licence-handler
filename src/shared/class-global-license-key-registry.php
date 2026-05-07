@@ -1,11 +1,14 @@
 <?php
 /**
- * Global License Key Registry.
+ * GravityWP — Unified Admin Page (Registry).
  *
- * Renders the GravityWP Settings page with a modern tabbed interface:
- * - Tab 1: Global License — for All Access / List / Agency plans
- * - Tab 2: Individual Plugin Keys — for Single Add-on plans
- * - Tab 3: License Overview — summary of all active licenses
+ * Single premium admin page that combines:
+ * - Hero with license status
+ * - Tab 1: Plugins (catalog)
+ * - Tab 2: License Keys (Global + Individual)
+ * - Tab 3: Overview (stats)
+ *
+ * Renders the entire page; uses Hub_Page only for plugin-card helpers.
  *
  * @package GravityWP\Shared
  * @since   2.1.0
@@ -20,9 +23,16 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 	/**
 	 * Class Global_License_Key_Registry
 	 *
-	 * Handles the settings page for both global and per-plugin license keys.
+	 * The unified GravityWP admin page (formerly two separate pages).
 	 */
 	class Global_License_Key_Registry {
+
+		/**
+		 * Page slug used for the single combined page.
+		 *
+		 * @var string
+		 */
+		const PAGE_SLUG = 'gravitywp';
 
 		/**
 		 * Used version of the handler.
@@ -39,14 +49,7 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 		private static $base_dir = '';
 
 		/**
-		 * Base URL of the shared assets.
-		 *
-		 * @var string
-		 */
-		private static $base_url = '';
-
-		/**
-		 * Initialize the settings page.
+		 * Initialize the page.
 		 *
 		 * @param string $version  The handler version.
 		 * @param string $base_dir Optional base directory for assets resolution.
@@ -56,28 +59,25 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 			self::$version  = $version;
 			self::$base_dir = $base_dir ? $base_dir : __DIR__;
 
-			// Priority 98 ensures Gravity Forms (priority 9) has registered its menu,
-			// and runs before Hub_Page (priority 99) so the parent menu exists.
+			// Priority 98: after Gravity Forms (priority 9), before Hub_Page legacy compat (99).
 			add_action( 'admin_menu', array( self::class, 'add_admin_menu' ), 98 );
 			add_action( 'admin_init', array( self::class, 'register_settings' ) );
 			add_action( 'admin_enqueue_scripts', array( self::class, 'enqueue_assets' ) );
 		}
 
 		/**
-		 * Register the GravityWP Settings admin page.
+		 * Register the unified GravityWP admin page.
 		 *
 		 * Adds as a submenu under Gravity Forms when available; otherwise creates
-		 * a top-level menu. This ensures the page is always accessible regardless
-		 * of whether Gravity Forms is installed.
+		 * a top-level menu so it works on any WordPress install.
 		 *
 		 * @return void
 		 */
 		public static function add_admin_menu() {
-			$page_title = __( 'GravityWP Settings', 'gravitywp-license-handler' );
+			$page_title = __( 'GravityWP', 'gravitywp-license-handler' );
 			$menu_title = 'GravityWP';
 			$capability = 'manage_options';
-			$menu_slug  = 'gravitywp-settings';
-			$callback   = array( self::class, 'render_settings_page' );
+			$callback   = array( self::class, 'render_page' );
 
 			// Detect if Gravity Forms is loaded and accessible.
 			global $admin_page_hooks;
@@ -90,22 +90,52 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 					$page_title,
 					$menu_title,
 					$capability,
-					$menu_slug,
+					self::PAGE_SLUG,
 					$callback
 				);
-				return;
+			} else {
+				// Fallback: create a top-level menu.
+				add_menu_page(
+					$page_title,
+					$menu_title,
+					$capability,
+					self::PAGE_SLUG,
+					$callback,
+					'dashicons-admin-generic',
+					81
+				);
 			}
 
-			// Fallback: create a top-level menu.
-			add_menu_page(
-				$page_title,
-				$menu_title,
-				$capability,
-				$menu_slug,
-				$callback,
-				'dashicons-admin-generic',
-				81
-			);
+			// Backward-compatible aliases — if anything still links to the old slugs,
+			// route them to this same page so users never see "page does not exist".
+			self::register_legacy_aliases( $capability, $callback );
+		}
+
+		/**
+		 * Register legacy slug aliases so old links don't 404.
+		 *
+		 * @param string   $capability Capability required.
+		 * @param callable $callback   Render callback.
+		 * @return void
+		 */
+		private static function register_legacy_aliases( $capability, $callback ) {
+			global $admin_page_hooks;
+
+			$aliases = array( 'gravitywp-settings', 'gravitywp-hub' );
+			foreach ( $aliases as $alias ) {
+				if ( isset( $admin_page_hooks[ $alias ] ) ) {
+					continue;
+				}
+				// Hidden submenu (no parent in menu): provides URL routing only.
+				add_submenu_page(
+					'',
+					'',
+					'',
+					$capability,
+					$alias,
+					$callback
+				);
+			}
 		}
 
 		/**
@@ -158,114 +188,171 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 		}
 
 		/**
-		 * Enqueue CSS and JS assets for the settings and hub pages.
+		 * Enqueue CSS and JS assets.
+		 *
+		 * Loads on the unified GravityWP page and all legacy aliases.
+		 * Uses multiple detection methods and defensive path resolution.
 		 *
 		 * @param string $hook Current admin page hook.
 		 * @return void
 		 */
 		public static function enqueue_assets( $hook ) {
-			if ( false === strpos( $hook, 'gravitywp-settings' ) && false === strpos( $hook, 'gravitywp-hub' ) ) {
+			// Detect if we're on our page via hook name OR the ?page= query arg.
+			// Both checks cover edge cases with legacy aliases and different parent menus.
+			$current_page = isset( $_GET['page'] ) ? sanitize_key( $_GET['page'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$is_our_page  = (
+				( is_string( $hook ) && false !== strpos( $hook, 'gravitywp' ) )
+				|| 0 === strpos( $current_page, 'gravitywp' )
+			);
+
+			if ( ! $is_our_page ) {
 				return;
 			}
 
-			$css_path = self::$base_dir . '/assets/css/gwp-admin.min.css';
-			$js_path  = self::$base_dir . '/assets/js/gwp-admin.min.js';
-
-			$css_url = self::resolve_asset_url( $css_path );
-			$js_url  = self::resolve_asset_url( $js_path );
-
-			if ( $css_url ) {
-				wp_enqueue_style(
-					'gwp-admin',
-					$css_url,
-					array( 'dashicons' ),
-					self::$version
-				);
+			// Resolve a URL base for our assets using the registry file's location.
+			// This works across Strauss-bundled, vendor/, lib/, or standalone installs.
+			$base_url = self::get_assets_base_url();
+			if ( ! $base_url ) {
+				// Last-resort fallback: emit inline critical CSS so the page isn't unstyled.
+				self::emit_inline_critical_css();
+				return;
 			}
 
-			if ( $js_url ) {
-				wp_enqueue_script(
-					'gwp-admin',
-					$js_url,
-					array(),
-					self::$version,
-					true
-				);
-			}
+			// Prefer source files (always up to date); use minified only if source is missing.
+			$css_src_exists = file_exists( self::$base_dir . '/assets/css/gwp-admin.css' );
+			$js_src_exists  = file_exists( self::$base_dir . '/assets/js/gwp-admin.js' );
+			$css_file       = $css_src_exists ? 'gwp-admin.css' : 'gwp-admin.min.css';
+			$js_file        = $js_src_exists ? 'gwp-admin.js' : 'gwp-admin.min.js';
+
+			$css_url = $base_url . 'assets/css/' . $css_file;
+			$js_url  = $base_url . 'assets/js/' . $js_file;
+
+			wp_enqueue_style( 'gravitywp-licence-ui', $css_url, array( 'dashicons' ), self::$version );
+			wp_enqueue_script( 'gravitywp-licence-ui', $js_url, array(), self::$version, true );
 		}
 
 		/**
-		 * Resolve an absolute filesystem path to a plugin URL.
+		 * Get the URL for the assets directory.
 		 *
-		 * Works regardless of how the library is bundled (lib/, vendor/, etc.).
+		 * Tries multiple strategies so it works with any install layout:
+		 * 1. plugin_dir_url() on the registry file (covers most cases)
+		 * 2. Manual translation from WP_PLUGIN_DIR
+		 * 3. Manual translation from WP_CONTENT_DIR
 		 *
-		 * @param string $file_path Absolute filesystem path.
-		 * @return string|false URL or false on failure.
+		 * @return string|false URL ending in a slash, or false.
 		 */
-		private static function resolve_asset_url( $file_path ) {
-			if ( ! file_exists( $file_path ) ) {
-				return false;
+		private static function get_assets_base_url() {
+			$base_dir_norm = wp_normalize_path( self::$base_dir );
+
+			// Strategy 1: Use WordPress's built-in resolver via a file inside our dir.
+			$registry_file = $base_dir_norm . '/class-global-license-key-registry.php';
+			if ( file_exists( $registry_file ) ) {
+				$url = plugin_dir_url( $registry_file );
+				if ( ! empty( $url ) && false !== strpos( $url, 'http' ) ) {
+					return $url;
+				}
 			}
 
-			$file_path = wp_normalize_path( $file_path );
+			// Strategy 2: Translate from WP_PLUGIN_DIR.
 			$plugins_dir = wp_normalize_path( WP_PLUGIN_DIR );
+			if ( 0 === strpos( $base_dir_norm, $plugins_dir ) ) {
+				$relative = ltrim( substr( $base_dir_norm, strlen( $plugins_dir ) ), '/' );
+				return trailingslashit( plugins_url() . '/' . $relative );
+			}
 
-			if ( strpos( $file_path, $plugins_dir ) === 0 ) {
-				$relative = substr( $file_path, strlen( $plugins_dir ) );
-				return plugins_url( $relative );
+			// Strategy 3: Translate from WP_CONTENT_DIR (covers muplugins, symlinks, etc).
+			$content_dir = wp_normalize_path( WP_CONTENT_DIR );
+			if ( 0 === strpos( $base_dir_norm, $content_dir ) ) {
+				$relative = ltrim( substr( $base_dir_norm, strlen( $content_dir ) ), '/' );
+				return trailingslashit( content_url() . '/' . $relative );
 			}
 
 			return false;
 		}
 
 		/**
-		 * Render the settings page with tabs.
+		 * Emit critical inline CSS as a fallback when asset URLs can't be resolved.
+		 *
+		 * Only runs in the rare case that all path-resolution strategies fail —
+		 * ensures the page isn't completely unstyled.
 		 *
 		 * @return void
 		 */
-		public static function render_settings_page() {
+		private static function emit_inline_critical_css() {
+			add_action(
+				'admin_head',
+				function () {
+					echo "<style>\n"
+						. ".gwp-tab-panel{display:none}"
+						. ".gwp-tab-panel.is-active{display:block}"
+						. ".gwp-tabs{display:flex;gap:6px;padding:6px;background:#fff;border:1px solid #dcdcde;border-radius:12px;margin:0 0 24px}"
+						. ".gwp-tab{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:8px;text-decoration:none;color:#495057;font-weight:500}"
+						. ".gwp-tab.is-active{background:#2271b1;color:#fff}"
+						. ".gwp-hero{padding:32px;border-radius:16px;margin:0 0 28px;background:linear-gradient(135deg,#1a5fb4 0%,#2d8f5f 100%);color:#fff}"
+						. ".gwp-plugin-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}"
+						. ".gwp-plugin-card{background:#fff;border:1px solid #dcdcde;border-radius:12px;padding:16px}"
+						. "</style>\n";
+				}
+			);
+		}
+
+		/**
+		 * Render the unified GravityWP page.
+		 *
+		 * @return void
+		 */
+		public static function render_page() {
 			wp_enqueue_style( 'dashicons' );
 
-			$global_key = get_option( 'gravitywp_global_license_key', '' );
-			$plugin_keys = get_option( 'gravitywp_plugin_license_keys', array() );
-			if ( ! is_array( $plugin_keys ) ) {
-				$plugin_keys = array();
-			}
+			// Allow refresh via URL parameter.
+			$force_refresh = isset( $_GET['refresh'] ) && '1' === $_GET['refresh']; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$hub_data      = Hub_Manager::get_hub_data( $force_refresh );
 
-			$hub_data   = Hub_Manager::get_hub_data();
-			$global_info = $hub_data['license']['global'] ?? array();
+			$global_info     = $hub_data['license']['global'] ?? array();
 			$per_plugin_info = $hub_data['license']['per_plugin'] ?? array();
 			if ( is_object( $per_plugin_info ) ) {
 				$per_plugin_info = (array) $per_plugin_info;
 			}
 			$all_plugins = $hub_data['plugins'] ?? array();
+			$global_key  = get_option( 'gravitywp_global_license_key', '' );
+			$plugin_keys = get_option( 'gravitywp_plugin_license_keys', array() );
+			if ( ! is_array( $plugin_keys ) ) {
+				$plugin_keys = array();
+			}
+
+			// Categorize plugins.
+			$unlocked = array();
+			$locked   = array();
+			foreach ( $all_plugins as $p ) {
+				if ( ! empty( $p['has_access'] ) ) {
+					$unlocked[] = $p;
+				} else {
+					$locked[] = $p;
+				}
+			}
+
+			// Get installed plugins for version comparison.
+			if ( ! function_exists( 'get_plugins' ) ) {
+				require_once ABSPATH . 'wp-admin/includes/plugin.php';
+			}
+			$installed_plugins = get_plugins();
+
+			$has_any_license = Hub_Manager::has_any_valid_license();
 			?>
 			<div class="wrap gwp-admin">
-				<div class="gwp-admin-header">
-					<h1 class="gwp-admin-header__title">
-						<span class="dashicons dashicons-admin-generic"></span>
-						<?php esc_html_e( 'GravityWP Settings', 'gravitywp-license-handler' ); ?>
-						<span class="gwp-admin-header__version">v<?php echo esc_html( self::$version ); ?></span>
-					</h1>
-					<div class="gwp-admin-header__actions">
-						<a href="<?php echo esc_url( admin_url( 'admin.php?page=gravitywp-hub' ) ); ?>" class="gwp-btn gwp-btn--secondary">
-							<span class="dashicons dashicons-admin-plugins"></span>
-							<?php esc_html_e( 'View Hub', 'gravitywp-license-handler' ); ?>
-						</a>
-					</div>
-				</div>
+				<?php self::render_hero( $global_info, $per_plugin_info, $global_key, $has_any_license, count( $unlocked ), count( $all_plugins ) ); ?>
 
 				<nav class="gwp-tabs" role="tablist">
-					<a href="#global" class="gwp-tab is-active" data-gwp-tab="global" role="tab">
-						<span class="dashicons dashicons-admin-network"></span>
-						<?php esc_html_e( 'Global License', 'gravitywp-license-handler' ); ?>
-					</a>
-					<a href="#individual" class="gwp-tab" data-gwp-tab="individual" role="tab">
+					<a href="#plugins" class="gwp-tab is-active" data-gwp-tab="plugins" role="tab">
 						<span class="dashicons dashicons-admin-plugins"></span>
-						<?php esc_html_e( 'Individual Keys', 'gravitywp-license-handler' ); ?>
-						<?php if ( ! empty( $plugin_keys ) ) : ?>
-							<span class="gwp-tab__badge"><?php echo esc_html( count( $plugin_keys ) ); ?></span>
+						<?php esc_html_e( 'Plugins', 'gravitywp-license-handler' ); ?>
+						<?php if ( ! empty( $all_plugins ) ) : ?>
+							<span class="gwp-tab__badge"><?php echo esc_html( count( $all_plugins ) ); ?></span>
 						<?php endif; ?>
+					</a>
+					<a href="#license-keys" class="gwp-tab" data-gwp-tab="license-keys" role="tab">
+						<span class="dashicons dashicons-admin-network"></span>
+						<?php esc_html_e( 'License Keys', 'gravitywp-license-handler' ); ?>
 					</a>
 					<a href="#overview" class="gwp-tab" data-gwp-tab="overview" role="tab">
 						<span class="dashicons dashicons-chart-pie"></span>
@@ -273,41 +360,253 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 					</a>
 				</nav>
 
-				<form method="post" action="options.php">
-					<?php settings_fields( 'gravitywp_settings_group' ); ?>
+				<?php // ================ Tab 1: Plugins ================ ?>
+				<div class="gwp-tab-panel is-active" data-gwp-panel="plugins" role="tabpanel">
+					<?php self::render_plugins_tab( $unlocked, $locked, $installed_plugins, $global_key, count( $plugin_keys ) ); ?>
+				</div>
 
-					<?php // ============ Tab 1: Global License ============ ?>
-					<div class="gwp-tab-panel is-active" data-gwp-panel="global" role="tabpanel">
-						<?php self::render_global_tab( $global_key, $global_info, $all_plugins ); ?>
-					</div>
+				<?php // ================ Tab 2: License Keys ================ ?>
+				<div class="gwp-tab-panel" data-gwp-panel="license-keys" role="tabpanel">
+					<form method="post" action="options.php">
+						<?php settings_fields( 'gravitywp_settings_group' ); ?>
+						<?php self::render_global_license_card( $global_key, $global_info, $unlocked ); ?>
+						<?php self::render_individual_keys_card( $plugin_keys, $per_plugin_info, $all_plugins ); ?>
+						<p class="gwp-form-actions">
+							<?php submit_button( __( 'Save License Keys', 'gravitywp-license-handler' ), 'primary large', 'submit', false, array( 'class' => 'button button-primary button-large' ) ); ?>
+						</p>
+					</form>
+				</div>
 
-					<?php // ============ Tab 2: Individual Keys ============ ?>
-					<div class="gwp-tab-panel" data-gwp-panel="individual" role="tabpanel">
-						<?php self::render_individual_tab( $plugin_keys, $per_plugin_info, $all_plugins ); ?>
-					</div>
-
-					<?php // ============ Tab 3: Overview ============ ?>
-					<div class="gwp-tab-panel" data-gwp-panel="overview" role="tabpanel">
-						<?php self::render_overview_tab( $global_info, $per_plugin_info, $all_plugins ); ?>
-					</div>
-
-					<p style="margin-top: 24px;">
-						<?php submit_button( __( 'Save All Settings', 'gravitywp-license-handler' ), 'primary', 'submit', false ); ?>
-					</p>
-				</form>
+				<?php // ================ Tab 3: Overview ================ ?>
+				<div class="gwp-tab-panel" data-gwp-panel="overview" role="tabpanel">
+					<?php self::render_overview_tab( $global_info, $per_plugin_info, $all_plugins ); ?>
+				</div>
 			</div>
 			<?php
 		}
 
 		/**
-		 * Render the Global License tab.
+		 * Render the premium hero section at the top of the page.
+		 *
+		 * @param array  $global_info     Global license info.
+		 * @param array  $per_plugin_info Per-plugin license info.
+		 * @param string $global_key      Current global key.
+		 * @param bool   $has_any_license Whether any license is valid.
+		 * @param int    $unlocked_count  Number of unlocked plugins.
+		 * @param int    $total_count     Total plugins.
+		 * @return void
+		 */
+		private static function render_hero( $global_info, $per_plugin_info, $global_key, $has_any_license, $unlocked_count, $total_count ) {
+			$has_per_plugin = ! empty( $per_plugin_info );
+			$plan_badge     = null;
+			$plan_label     = '';
+			$expires        = '';
+			$site_count     = 0;
+			$site_limit     = 0;
+
+			if ( empty( $global_key ) && ! $has_per_plugin ) {
+				$state    = 'empty';
+				$title    = __( 'Welcome to GravityWP', 'gravitywp-license-handler' );
+				$subtitle = __( 'Enter a license key to unlock and manage your plugins.', 'gravitywp-license-handler' );
+			} elseif ( $has_any_license ) {
+				$state         = 'active';
+				$global_valid  = ( ( $global_info['status'] ?? '' ) === 'valid' );
+
+				if ( $global_valid ) {
+					$plan_badge = $global_info['plan_type'] ?? Plan_Types::UNKNOWN;
+					$plan_label = Plan_Types::get_label( $plan_badge );
+					$title      = $global_info['plan_name'] ?? __( 'License Active', 'gravitywp-license-handler' );
+					$expires    = $global_info['expires'] ?? '';
+					$site_count = (int) ( $global_info['site_count'] ?? 0 );
+					$site_limit = (int) ( $global_info['license_limit'] ?? 0 );
+					$subtitle   = __( 'Your plugins are unlocked and ready to use.', 'gravitywp-license-handler' );
+				} else {
+					$valid_per = 0;
+					foreach ( $per_plugin_info as $info ) {
+						if ( ( $info['status'] ?? '' ) === 'valid' ) {
+							++$valid_per;
+						}
+					}
+					$plan_badge = Plan_Types::SINGLE_ADDON;
+					$plan_label = Plan_Types::get_label( $plan_badge );
+					$title      = sprintf(
+						/* translators: %d: count */
+						_n( '%d Individual License Active', '%d Individual Licenses Active', $valid_per, 'gravitywp-license-handler' ),
+						$valid_per
+					);
+					$subtitle = __( 'Single Add-on licenses applied.', 'gravitywp-license-handler' );
+				}
+			} else {
+				$state    = 'invalid';
+				$title    = __( 'License Invalid or Expired', 'gravitywp-license-handler' );
+				$subtitle = self::get_first_error_message( $global_info );
+			}
+
+			$cache_remaining = Hub_Manager::get_cache_ttl_remaining();
+			$cache_hours     = (int) floor( $cache_remaining / 3600 );
+			$cache_minutes   = (int) floor( ( $cache_remaining % 3600 ) / 60 );
+			$refresh_url     = add_query_arg( array( 'page' => self::PAGE_SLUG, 'refresh' => '1' ), admin_url( 'admin.php' ) );
+			?>
+			<div class="gwp-hero gwp-hero--<?php echo esc_attr( $state ); ?>">
+				<div class="gwp-hero__bg" aria-hidden="true"></div>
+
+				<div class="gwp-hero__content">
+					<div class="gwp-hero__brand">
+						<div class="gwp-hero__logo">
+							<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+								<path d="M16 2L4 8v10c0 6.6 5 12 12 12s12-5.4 12-12V8L16 2z" fill="currentColor" opacity=".15"/>
+								<path d="M16 2L4 8v10c0 6.6 5 12 12 12s12-5.4 12-12V8L16 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+								<path d="M11 16l3.5 3.5L21 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+							</svg>
+						</div>
+						<div class="gwp-hero__brand-text">
+							<div class="gwp-hero__eyebrow"><?php esc_html_e( 'GravityWP', 'gravitywp-license-handler' ); ?></div>
+							<h1 class="gwp-hero__title">
+								<?php echo esc_html( $title ); ?>
+								<?php if ( $plan_badge ) : ?>
+									<span class="gwp-plan-badge gwp-plan-badge--<?php echo esc_attr( $plan_badge ); ?>">
+										<span class="dashicons <?php echo esc_attr( Plan_Types::get_icon( $plan_badge ) ); ?>"></span>
+										<?php echo esc_html( $plan_label ); ?>
+									</span>
+								<?php endif; ?>
+							</h1>
+							<p class="gwp-hero__subtitle"><?php echo esc_html( $subtitle ); ?></p>
+						</div>
+					</div>
+
+					<?php if ( 'active' === $state ) : ?>
+						<div class="gwp-hero__stats">
+							<div class="gwp-hero__stat">
+								<div class="gwp-hero__stat-value">
+									<?php echo esc_html( $unlocked_count ); ?><span class="gwp-hero__stat-divider">/</span><?php echo esc_html( $total_count ); ?>
+								</div>
+								<div class="gwp-hero__stat-label"><?php esc_html_e( 'Plugins unlocked', 'gravitywp-license-handler' ); ?></div>
+							</div>
+							<?php if ( $site_count || $site_limit ) : ?>
+								<div class="gwp-hero__stat">
+									<div class="gwp-hero__stat-value">
+										<?php echo esc_html( $site_count ); ?><span class="gwp-hero__stat-divider">/</span><?php echo esc_html( 0 === $site_limit ? '∞' : $site_limit ); ?>
+									</div>
+									<div class="gwp-hero__stat-label"><?php esc_html_e( 'Sites used', 'gravitywp-license-handler' ); ?></div>
+								</div>
+							<?php endif; ?>
+							<?php if ( ! empty( $expires ) ) : ?>
+								<div class="gwp-hero__stat">
+									<div class="gwp-hero__stat-value gwp-hero__stat-value--small">
+										<?php
+										if ( 'lifetime' === $expires ) {
+											esc_html_e( 'Lifetime', 'gravitywp-license-handler' );
+										} else {
+											echo esc_html( gmdate( 'M j, Y', strtotime( $expires ) ) );
+										}
+										?>
+									</div>
+									<div class="gwp-hero__stat-label"><?php esc_html_e( 'Expires', 'gravitywp-license-handler' ); ?></div>
+								</div>
+							<?php endif; ?>
+						</div>
+					<?php endif; ?>
+				</div>
+
+				<div class="gwp-hero__actions">
+					<a href="<?php echo esc_url( $refresh_url ); ?>" class="gwp-hero__refresh" title="<?php esc_attr_e( 'Refresh data', 'gravitywp-license-handler' ); ?>" data-gwp-refresh>
+						<span class="dashicons dashicons-update"></span>
+						<span class="screen-reader-text"><?php esc_html_e( 'Refresh', 'gravitywp-license-handler' ); ?></span>
+					</a>
+					<?php if ( $cache_remaining > 0 ) : ?>
+						<div class="gwp-hero__cache-info">
+							<?php
+							printf(
+								/* translators: %1$d: hours, %2$d: minutes */
+								esc_html__( 'Updated • next refresh in %1$dh %2$dm', 'gravitywp-license-handler' ),
+								$cache_hours,
+								$cache_minutes
+							);
+							?>
+						</div>
+					<?php endif; ?>
+					<div class="gwp-hero__version">v<?php echo esc_html( self::$version ); ?></div>
+				</div>
+			</div>
+			<?php
+		}
+
+		/**
+		 * Render the Plugins tab — catalog of all plugins.
+		 *
+		 * @param array  $unlocked          Unlocked plugin data.
+		 * @param array  $locked            Locked plugin data.
+		 * @param array  $installed_plugins Installed WP plugins.
+		 * @param string $global_key        Current global key.
+		 * @param int    $plugin_keys_count Number of saved per-plugin keys.
+		 * @return void
+		 */
+		private static function render_plugins_tab( $unlocked, $locked, $installed_plugins, $global_key, $plugin_keys_count ) {
+			if ( empty( $unlocked ) && empty( $locked ) ) {
+				?>
+				<div class="gwp-empty-state">
+					<span class="dashicons dashicons-admin-plugins"></span>
+					<h3 class="gwp-empty-state__title"><?php esc_html_e( 'No plugins to show yet', 'gravitywp-license-handler' ); ?></h3>
+					<p class="gwp-empty-state__text">
+						<?php
+						if ( empty( $global_key ) && 0 === $plugin_keys_count ) {
+							esc_html_e( 'Enter a license key to see your plugins.', 'gravitywp-license-handler' );
+						} else {
+							esc_html_e( 'Try refreshing the data to see the latest catalog.', 'gravitywp-license-handler' );
+						}
+						?>
+					</p>
+					<?php if ( empty( $global_key ) && 0 === $plugin_keys_count ) : ?>
+						<a href="#license-keys" class="gwp-btn gwp-btn--primary" data-gwp-tab-link="license-keys">
+							<span class="dashicons dashicons-admin-network"></span>
+							<?php esc_html_e( 'Add a License Key', 'gravitywp-license-handler' ); ?>
+						</a>
+					<?php endif; ?>
+				</div>
+				<?php
+				return;
+			}
+
+			if ( ! empty( $unlocked ) ) :
+				?>
+				<h2 class="gwp-section-title is-unlocked">
+					<span class="dashicons dashicons-unlock"></span>
+					<?php esc_html_e( 'Your Plugins', 'gravitywp-license-handler' ); ?>
+					<span class="gwp-section-title__count"><?php echo esc_html( count( $unlocked ) ); ?></span>
+				</h2>
+				<div class="gwp-plugin-grid">
+					<?php foreach ( $unlocked as $plugin ) : ?>
+						<?php Hub_Page::render_plugin_card( $plugin, $installed_plugins, 'unlocked' ); ?>
+					<?php endforeach; ?>
+				</div>
+				<?php
+			endif;
+
+			if ( ! empty( $locked ) ) :
+				?>
+				<h2 class="gwp-section-title is-locked">
+					<span class="dashicons dashicons-lock"></span>
+					<?php esc_html_e( 'Available with Upgrade', 'gravitywp-license-handler' ); ?>
+					<span class="gwp-section-title__count"><?php echo esc_html( count( $locked ) ); ?></span>
+				</h2>
+				<div class="gwp-plugin-grid">
+					<?php foreach ( $locked as $plugin ) : ?>
+						<?php Hub_Page::render_plugin_card( $plugin, $installed_plugins, 'locked' ); ?>
+					<?php endforeach; ?>
+				</div>
+				<?php
+			endif;
+		}
+
+		/**
+		 * Render the Global License card (in License Keys tab).
 		 *
 		 * @param string $global_key  Current global key.
 		 * @param array  $global_info License info from hub.
-		 * @param array  $all_plugins All plugins from hub.
+		 * @param array  $unlocked    Unlocked plugins.
 		 * @return void
 		 */
-		private static function render_global_tab( $global_key, $global_info, $all_plugins ) {
+		private static function render_global_license_card( $global_key, $global_info, $unlocked ) {
 			$status    = $global_info['status'] ?? 'no_key';
 			$plan_type = $global_info['plan_type'] ?? Plan_Types::UNKNOWN;
 			$plan_name = $global_info['plan_name'] ?? '';
@@ -315,10 +614,9 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 			$limit     = $global_info['license_limit'] ?? 0;
 			$count     = $global_info['site_count'] ?? 0;
 
-			// Count unlocked via global.
 			$unlocked_global = 0;
-			foreach ( $all_plugins as $p ) {
-				if ( ! empty( $p['has_access'] ) && 'global' === ( $p['access_source'] ?? '' ) ) {
+			foreach ( $unlocked as $p ) {
+				if ( 'global' === ( $p['access_source'] ?? '' ) ) {
 					++$unlocked_global;
 				}
 			}
@@ -393,7 +691,7 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 							<div class="gwp-alert__content">
 								<p class="gwp-alert__title"><?php esc_html_e( 'No global license key configured', 'gravitywp-license-handler' ); ?></p>
 								<p class="gwp-alert__text">
-									<?php esc_html_e( 'Enter your key above and save. If you have a Single Add-on license, use the "Individual Keys" tab instead.', 'gravitywp-license-handler' ); ?>
+									<?php esc_html_e( 'Enter your key above and save. If you have a Single Add-on license, use the Individual Plugin Keys section below.', 'gravitywp-license-handler' ); ?>
 								</p>
 							</div>
 						</div>
@@ -406,7 +704,7 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 									<?php
 									$errors = $global_info['errors'] ?? array();
 									if ( ! empty( $errors ) && is_array( $errors ) ) {
-										foreach ( $errors as $code => $messages ) {
+										foreach ( $errors as $messages ) {
 											foreach ( (array) $messages as $msg ) {
 												echo esc_html( $msg ) . '<br />';
 											}
@@ -425,14 +723,14 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 		}
 
 		/**
-		 * Render the Individual Keys tab.
+		 * Render the Individual Plugin Keys card (in License Keys tab).
 		 *
-		 * @param array $plugin_keys    Saved per-plugin keys.
+		 * @param array $plugin_keys     Saved per-plugin keys.
 		 * @param array $per_plugin_info License info per plugin from hub.
-		 * @param array $all_plugins    All plugins from hub.
+		 * @param array $all_plugins     All plugins from hub.
 		 * @return void
 		 */
-		private static function render_individual_tab( $plugin_keys, $per_plugin_info, $all_plugins ) {
+		private static function render_individual_keys_card( $plugin_keys, $per_plugin_info, $all_plugins ) {
 			?>
 			<div class="gwp-card">
 				<div class="gwp-card__header">
@@ -440,6 +738,9 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 						<span class="dashicons dashicons-admin-plugins"></span>
 						<?php esc_html_e( 'Individual Plugin Keys', 'gravitywp-license-handler' ); ?>
 					</h2>
+					<?php if ( ! empty( $plugin_keys ) ) : ?>
+						<span class="gwp-tab__badge"><?php echo esc_html( count( $plugin_keys ) ); ?></span>
+					<?php endif; ?>
 				</div>
 				<div class="gwp-card__body">
 					<p class="gwp-card__subtitle">
@@ -447,11 +748,10 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 					</p>
 
 					<?php if ( empty( $all_plugins ) ) : ?>
-						<div class="gwp-empty-state">
+						<div class="gwp-empty-state" style="padding: 30px 20px;">
 							<span class="dashicons dashicons-admin-plugins"></span>
-							<h3 class="gwp-empty-state__title"><?php esc_html_e( 'No plugins available', 'gravitywp-license-handler' ); ?></h3>
 							<p class="gwp-empty-state__text">
-								<?php esc_html_e( 'Enter a license key or refresh to see available plugins.', 'gravitywp-license-handler' ); ?>
+								<?php esc_html_e( 'No plugins available. Save a license key first or refresh the data.', 'gravitywp-license-handler' ); ?>
 							</p>
 						</div>
 					<?php else : ?>
@@ -610,7 +910,7 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 						?>
 					</p>
 					<p class="gwp-info-box__sub">
-						<a href="<?php echo esc_url( admin_url( 'admin.php?page=gravitywp-settings&refresh=1#overview' ) ); ?>" class="gwp-refresh-link">
+						<a href="<?php echo esc_url( add_query_arg( array( 'page' => self::PAGE_SLUG, 'refresh' => '1' ), admin_url( 'admin.php' ) ) ); ?>" class="gwp-refresh-link" data-gwp-refresh>
 							<span class="dashicons dashicons-update"></span>
 							<?php esc_html_e( 'Refresh now', 'gravitywp-license-handler' ); ?>
 						</a>
@@ -629,7 +929,6 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 					<?php
 					$has_any = false;
 
-					// Global license.
 					if ( ! empty( $global_info ) && ( $global_info['status'] ?? '' ) === 'valid' ) {
 						$has_any = true;
 						self::render_license_row(
@@ -639,7 +938,6 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 						);
 					}
 
-					// Per-plugin licenses.
 					foreach ( $per_plugin_info as $slug => $info ) {
 						if ( ( $info['status'] ?? '' ) === 'valid' ) {
 							$has_any = true;
@@ -658,7 +956,7 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 						?>
 						<div class="gwp-empty-state" style="padding: 30px 20px;">
 							<span class="dashicons dashicons-admin-network"></span>
-							<p class="gwp-empty-state__text"><?php esc_html_e( 'No active licenses. Enter a license key in the Global or Individual tabs.', 'gravitywp-license-handler' ); ?></p>
+							<p class="gwp-empty-state__text"><?php esc_html_e( 'No active licenses. Add one in the License Keys tab.', 'gravitywp-license-handler' ); ?></p>
 						</div>
 						<?php
 					endif;
@@ -671,8 +969,8 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 		/**
 		 * Render a single license row in the Overview.
 		 *
-		 * @param string $label  The display label.
-		 * @param array  $info   The license info.
+		 * @param string $label  Display label.
+		 * @param array  $info   License info.
 		 * @param string $source 'global' or 'per_plugin'.
 		 * @return void
 		 */
@@ -705,6 +1003,24 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 				</div>
 			</div>
 			<?php
+		}
+
+		/**
+		 * Get the first error message from a license info array.
+		 *
+		 * @param array $info License info.
+		 * @return string
+		 */
+		private static function get_first_error_message( $info ) {
+			$errors = $info['errors'] ?? array();
+			if ( ! empty( $errors ) && is_array( $errors ) ) {
+				foreach ( $errors as $messages ) {
+					foreach ( (array) $messages as $msg ) {
+						return (string) $msg;
+					}
+				}
+			}
+			return __( 'Please check your license or contact support.', 'gravitywp-license-handler' );
 		}
 	}
 }
