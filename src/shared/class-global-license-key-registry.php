@@ -340,18 +340,11 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 				$plugin_keys = array();
 			}
 
-			// Categorize plugins by lifecycle status, then by license access.
-			$unlocked       = array();
-			$locked         = array();
-			$coming_soon    = array();
-			$in_development = array();
+			// Categorize plugins by license access.
+			$unlocked = array();
+			$locked   = array();
 			foreach ( $all_plugins as $p ) {
-				$plugin_status = $p['status'] ?? 'released';
-				if ( 'coming-soon' === $plugin_status ) {
-					$coming_soon[] = $p;
-				} elseif ( 'in-development' === $plugin_status ) {
-					$in_development[] = $p;
-				} elseif ( ! empty( $p['has_access'] ) ) {
+				if ( ! empty( $p['has_access'] ) ) {
 					$unlocked[] = $p;
 				} else {
 					$locked[] = $p;
@@ -383,9 +376,14 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 					</a>
 				</nav>
 
+				<?php
+				$render_context = array(
+					'global_plan_type' => $global_info['plan_type'] ?? Plan_Types::UNKNOWN,
+				);
+				?>
 				<?php // ================ Tab 1: Plugins ================ ?>
 				<div class="gwp-tab-panel is-active" data-gwp-panel="plugins" role="tabpanel">
-					<?php self::render_plugins_tab( $unlocked, $locked, $coming_soon, $in_development, $installed_plugins, $global_key, count( $plugin_keys ) ); ?>
+					<?php self::render_plugins_tab( $unlocked, $locked, $installed_plugins, $global_key, count( $plugin_keys ), $render_context ); ?>
 				</div>
 
 				<?php // ================ Tab 2: License Keys ================ ?>
@@ -553,17 +551,18 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 		/**
 		 * Render the Plugins tab — catalog of all plugins.
 		 *
-		 * @param array  $unlocked          Released plugins the user has license access to (or free).
-		 * @param array  $locked            Released premium plugins the license doesn't cover.
-		 * @param array  $coming_soon       Plugins with status=coming-soon.
-		 * @param array  $in_development    Plugins with status=in-development.
+		 * @param array  $unlocked          Plugins the user has license access to (or free).
+		 * @param array  $locked            Premium plugins the license doesn't cover.
 		 * @param array  $installed_plugins Installed WP plugins.
 		 * @param string $global_key        Current global key.
 		 * @param int    $plugin_keys_count Number of saved per-plugin keys.
+		 * @param array  $context           Render context forwarded to Hub_Page::render_plugin_card.
+		 *                                  Carries 'global_plan_type' so source badges can show
+		 *                                  the actual plan name (All Access / Agency / etc).
 		 * @return void
 		 */
-		private static function render_plugins_tab( $unlocked, $locked, $coming_soon, $in_development, $installed_plugins, $global_key, $plugin_keys_count ) {
-			if ( empty( $unlocked ) && empty( $locked ) && empty( $coming_soon ) && empty( $in_development ) ) {
+		private static function render_plugins_tab( $unlocked, $locked, $installed_plugins, $global_key, $plugin_keys_count, $context = array() ) {
+			if ( empty( $unlocked ) && empty( $locked ) ) {
 				?>
 				<div class="gwp-empty-state">
 					<span class="dashicons dashicons-admin-plugins"></span>
@@ -597,7 +596,7 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 				</h2>
 				<div class="gwp-plugin-grid">
 					<?php foreach ( $unlocked as $plugin ) : ?>
-						<?php Hub_Page::render_plugin_card( $plugin, $installed_plugins, 'unlocked' ); ?>
+						<?php Hub_Page::render_plugin_card( $plugin, $installed_plugins, 'unlocked', $context ); ?>
 					<?php endforeach; ?>
 				</div>
 				<?php
@@ -612,37 +611,7 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 				</h2>
 				<div class="gwp-plugin-grid">
 					<?php foreach ( $locked as $plugin ) : ?>
-						<?php Hub_Page::render_plugin_card( $plugin, $installed_plugins, 'locked' ); ?>
-					<?php endforeach; ?>
-				</div>
-				<?php
-			endif;
-
-			if ( ! empty( $coming_soon ) ) :
-				?>
-				<h2 class="gwp-section-title is-coming-soon">
-					<span class="dashicons dashicons-clock"></span>
-					<?php esc_html_e( 'Coming Soon', 'gravitywp-license-handler' ); ?>
-					<span class="gwp-section-title__count"><?php echo esc_html( count( $coming_soon ) ); ?></span>
-				</h2>
-				<div class="gwp-plugin-grid">
-					<?php foreach ( $coming_soon as $plugin ) : ?>
-						<?php Hub_Page::render_plugin_card( $plugin, $installed_plugins, 'coming-soon' ); ?>
-					<?php endforeach; ?>
-				</div>
-				<?php
-			endif;
-
-			if ( ! empty( $in_development ) ) :
-				?>
-				<h2 class="gwp-section-title is-in-development">
-					<span class="dashicons dashicons-hammer"></span>
-					<?php esc_html_e( 'In Development', 'gravitywp-license-handler' ); ?>
-					<span class="gwp-section-title__count"><?php echo esc_html( count( $in_development ) ); ?></span>
-				</h2>
-				<div class="gwp-plugin-grid">
-					<?php foreach ( $in_development as $plugin ) : ?>
-						<?php Hub_Page::render_plugin_card( $plugin, $installed_plugins, 'in-development' ); ?>
+						<?php Hub_Page::render_plugin_card( $plugin, $installed_plugins, 'locked', $context ); ?>
 					<?php endforeach; ?>
 				</div>
 				<?php

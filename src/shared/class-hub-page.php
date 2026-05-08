@@ -45,14 +45,22 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Page' ) ) {
 		 * @param array  $plugin            Plugin data from hub API.
 		 * @param array  $installed_plugins Installed WP plugins (from get_plugins()).
 		 * @param string $status            'unlocked' or 'locked'.
+		 * @param array  $context           Optional render context. Recognized keys:
+		 *                                  - 'global_plan_type' (string): plan_type from $global_info,
+		 *                                    used to label the source badge ("All Access", "Agency",
+		 *                                    "List Add-ons" instead of generic "Global").
 		 * @return void
 		 */
-		public static function render_plugin_card( $plugin, $installed_plugins, $status ) {
+		public static function render_plugin_card( $plugin, $installed_plugins, $status, $context = array() ) {
 			$slug          = $plugin['slug'] ?? '';
 			$name          = $plugin['name'] ?? $slug;
 			$description   = $plugin['description'] ?? '';
 			$new_version   = $plugin['new_version'] ?? '';
 			$access_source = $plugin['access_source'] ?? 'none';
+
+			// Resolve the source badge (label + CSS class) based on access source.
+			// Falls back to generic labels when plan type is unknown.
+			$source_badge = self::resolve_source_badge( $access_source, $context );
 
 			$icon = '';
 			if ( ! empty( $plugin['icons']['2x'] ) ) {
@@ -85,15 +93,9 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Page' ) ) {
 								<span class="gwp-plugin-card__version">v<?php echo esc_html( $new_version ); ?></span>
 							<?php endif; ?>
 
-							<?php if ( 'unlocked' === $status && $access_source && 'none' !== $access_source ) : ?>
-								<span class="gwp-plugin-card__source-badge gwp-plugin-card__source-badge--<?php echo esc_attr( $access_source ); ?>">
-									<?php
-									echo esc_html(
-										'global' === $access_source
-											? __( 'Global', 'gravitywp-license-handler' )
-											: __( 'Individual', 'gravitywp-license-handler' )
-									);
-									?>
+							<?php if ( 'unlocked' === $status && ! empty( $source_badge['label'] ) ) : ?>
+								<span class="gwp-plugin-card__source-badge gwp-plugin-card__source-badge--<?php echo esc_attr( $source_badge['variant'] ); ?>">
+									<?php echo esc_html( $source_badge['label'] ); ?>
 								</span>
 							<?php endif; ?>
 
@@ -122,6 +124,62 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Page' ) ) {
 		}
 
 		/**
+		 * Resolve the source badge for a plugin card.
+		 *
+		 * Maps `access_source` (and the global plan_type when relevant) to a
+		 * concrete plan label ("All Access", "Agency", "List Add-ons",
+		 * "Single Add-on", "Free") plus a CSS variant for the badge color.
+		 *
+		 * @param string $access_source One of 'global' | 'per_plugin' | 'free' | 'none'.
+		 * @param array  $context       Render context (see render_plugin_card).
+		 * @return array { 'label' => string, 'variant' => string } — empty label means "no badge".
+		 */
+		private static function resolve_source_badge( $access_source, $context ) {
+			if ( ! $access_source || 'none' === $access_source ) {
+				return array(
+					'label'   => '',
+					'variant' => '',
+				);
+			}
+
+			if ( 'free' === $access_source ) {
+				return array(
+					'label'   => __( 'Free', 'gravitywp-license-handler' ),
+					'variant' => 'free',
+				);
+			}
+
+			if ( 'per_plugin' === $access_source ) {
+				return array(
+					'label'   => Plan_Types::get_label( Plan_Types::SINGLE_ADDON ),
+					'variant' => Plan_Types::SINGLE_ADDON,
+				);
+			}
+
+			// 'global' — label depends on which global plan unlocks it.
+			if ( 'global' === $access_source ) {
+				$plan_type = isset( $context['global_plan_type'] ) ? (string) $context['global_plan_type'] : '';
+				if ( $plan_type && Plan_Types::UNKNOWN !== $plan_type ) {
+					return array(
+						'label'   => Plan_Types::get_label( $plan_type ),
+						'variant' => $plan_type,
+					);
+				}
+				// Fallback when plan type couldn't be detected.
+				return array(
+					'label'   => __( 'Global', 'gravitywp-license-handler' ),
+					'variant' => 'global',
+				);
+			}
+
+			// Unknown access source — no badge.
+			return array(
+				'label'   => '',
+				'variant' => '',
+			);
+		}
+
+		/**
 		 * Render the inner HTML of a plugin card's footer.
 		 *
 		 * Used in two places:
@@ -138,17 +196,10 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Page' ) ) {
 		public static function render_card_footer_html( $plugin, $installed_plugins, $status ) {
 			$slug = $plugin['slug'] ?? '';
 
-			switch ( $status ) {
-				case 'unlocked':
-					return self::render_unlocked_footer( $plugin, $installed_plugins, $slug );
-				case 'coming-soon':
-					return self::render_coming_soon_footer( $plugin, $slug );
-				case 'in-development':
-					return self::render_in_development_footer( $plugin, $slug );
-				case 'locked':
-				default:
-					return self::render_locked_footer( $plugin, $slug );
+			if ( 'unlocked' === $status ) {
+				return self::render_unlocked_footer( $plugin, $installed_plugins, $slug );
 			}
+			return self::render_locked_footer( $plugin, $slug );
 		}
 
 		/**
@@ -373,61 +424,6 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Page' ) ) {
 					$<?php echo esc_html( number_format( (float) $plugin['price'], 0 ) ); ?>
 				</span>
 			<?php endif; ?>
-			<?php
-			return (string) ob_get_clean();
-		}
-
-		/**
-		 * Footer for plugins with status=coming-soon.
-		 *
-		 * Informational only — no install/activate. If a purchase_url is set,
-		 * link to the product page so users can read about it.
-		 *
-		 * @param array  $plugin Plugin data.
-		 * @param string $slug   Plugin slug.
-		 * @return string
-		 */
-		private static function render_coming_soon_footer( $plugin, $slug ) {
-			$learn_url = ! empty( $plugin['purchase_url'] ) ? $plugin['purchase_url'] : '';
-
-			ob_start();
-			?>
-			<span class="gwp-plugin-card__status is-coming-soon">
-				<span class="dashicons dashicons-clock"></span>
-				<?php esc_html_e( 'Coming soon', 'gravitywp-license-handler' ); ?>
-			</span>
-			<?php if ( $learn_url ) : ?>
-				<a
-					href="<?php echo esc_url( $learn_url ); ?>"
-					target="_blank"
-					rel="noopener"
-					class="gwp-btn gwp-btn--secondary gwp-btn--sm"
-				>
-					<span class="dashicons dashicons-external"></span>
-					<?php esc_html_e( 'Learn more', 'gravitywp-license-handler' ); ?>
-				</a>
-			<?php endif; ?>
-			<?php
-			return (string) ob_get_clean();
-		}
-
-		/**
-		 * Footer for plugins with status=in-development.
-		 *
-		 * Informational only — no install/activate, no external link
-		 * (these aren't ready to be promoted yet).
-		 *
-		 * @param array  $plugin Plugin data.
-		 * @param string $slug   Plugin slug.
-		 * @return string
-		 */
-		private static function render_in_development_footer( $plugin, $slug ) {
-			ob_start();
-			?>
-			<span class="gwp-plugin-card__status is-in-development">
-				<span class="dashicons dashicons-hammer"></span>
-				<?php esc_html_e( 'In development', 'gravitywp-license-handler' ); ?>
-			</span>
 			<?php
 			return (string) ob_get_clean();
 		}

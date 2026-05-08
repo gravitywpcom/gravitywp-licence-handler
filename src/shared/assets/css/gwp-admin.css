@@ -785,14 +785,6 @@
 	color: var(--gwp-gray-500);
 }
 
-.gwp-section-title.is-coming-soon .dashicons {
-	color: var(--gwp-info);
-}
-
-.gwp-section-title.is-in-development .dashicons {
-	color: var(--gwp-warning);
-}
-
 .gwp-section-title__count {
 	display: inline-flex;
 	align-items: center;
@@ -844,42 +836,18 @@
 	background: linear-gradient(90deg, transparent, var(--gwp-gray-400), transparent);
 }
 
-.gwp-plugin-card.is-coming-soon::before,
-.gwp-plugin-card.is-in-development::before {
-	opacity: 1;
-	background: linear-gradient(90deg, transparent, var(--gwp-info), transparent);
-}
-
-.gwp-plugin-card.is-in-development::before {
-	background: linear-gradient(90deg, transparent, var(--gwp-warning), transparent);
-}
-
 .gwp-plugin-card:hover {
 	box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.12), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
 	transform: translateY(-2px);
 	border-color: var(--gwp-gray-300);
 }
 
-.gwp-plugin-card.is-locked,
-.gwp-plugin-card.is-coming-soon,
-.gwp-plugin-card.is-in-development {
+.gwp-plugin-card.is-locked {
 	opacity: 0.85;
 }
 
-.gwp-plugin-card.is-locked:hover,
-.gwp-plugin-card.is-coming-soon:hover,
-.gwp-plugin-card.is-in-development:hover {
+.gwp-plugin-card.is-locked:hover {
 	opacity: 1;
-}
-
-.gwp-plugin-card__status.is-coming-soon {
-	color: var(--gwp-info);
-	font-weight: 600;
-}
-
-.gwp-plugin-card__status.is-in-development {
-	color: var(--gwp-warning);
-	font-weight: 600;
 }
 
 .gwp-plugin-card__header {
@@ -963,6 +931,29 @@
 	letter-spacing: 0.3px;
 }
 
+/* Plan-aware source badges. Colors mirror Plan_Types::get_color() so the
+   small card badge matches the prominent plan badge in the Hero. */
+.gwp-plugin-card__source-badge--all_access {
+	background: #27AE60; /* green — All Access */
+}
+
+.gwp-plugin-card__source-badge--agency {
+	background: #8E44AD; /* purple — Agency */
+}
+
+.gwp-plugin-card__source-badge--list_addons {
+	background: #3498DB; /* blue — List Add-ons */
+}
+
+.gwp-plugin-card__source-badge--single_addon {
+	background: #F39C12; /* orange — Single Add-on */
+}
+
+.gwp-plugin-card__source-badge--free {
+	background: var(--gwp-info); /* info blue — Free */
+}
+
+/* Legacy fallbacks for when plan type can't be determined. */
 .gwp-plugin-card__source-badge--global {
 	background: var(--gwp-success);
 }
