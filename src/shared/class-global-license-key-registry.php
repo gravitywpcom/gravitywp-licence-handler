@@ -6,7 +6,6 @@
  * - Hero with license status
  * - Tab 1: Plugins (catalog)
  * - Tab 2: License Keys (Global + Individual)
- * - Tab 3: Overview (stats)
  *
  * Renders the entire page; uses Hub_Page only for plugin-card helpers.
  *
@@ -354,10 +353,6 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 						<span class="dashicons dashicons-admin-network"></span>
 						<?php esc_html_e( 'License Keys', 'gravitywp-license-handler' ); ?>
 					</a>
-					<a href="#overview" class="gwp-tab" data-gwp-tab="overview" role="tab">
-						<span class="dashicons dashicons-chart-pie"></span>
-						<?php esc_html_e( 'Overview', 'gravitywp-license-handler' ); ?>
-					</a>
 				</nav>
 
 				<?php // ================ Tab 1: Plugins ================ ?>
@@ -377,10 +372,6 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 					</form>
 				</div>
 
-				<?php // ================ Tab 3: Overview ================ ?>
-				<div class="gwp-tab-panel" data-gwp-panel="overview" role="tabpanel">
-					<?php self::render_overview_tab( $global_info, $per_plugin_info, $all_plugins ); ?>
-				</div>
 			</div>
 			<?php
 		}
@@ -835,179 +826,6 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 							</tbody>
 						</table>
 					<?php endif; ?>
-				</div>
-			</div>
-			<?php
-		}
-
-		/**
-		 * Render the Overview tab.
-		 *
-		 * @param array $global_info     Global license info.
-		 * @param array $per_plugin_info Per-plugin license info.
-		 * @param array $all_plugins     All plugins from hub.
-		 * @return void
-		 */
-		private static function render_overview_tab( $global_info, $per_plugin_info, $all_plugins ) {
-			$counts         = array( 'unlocked' => 0, 'locked' => 0, 'total' => count( $all_plugins ) );
-			$global_unlocks = 0;
-			$per_unlocks    = 0;
-
-			foreach ( $all_plugins as $p ) {
-				if ( ! empty( $p['has_access'] ) ) {
-					++$counts['unlocked'];
-					if ( 'global' === ( $p['access_source'] ?? '' ) ) {
-						++$global_unlocks;
-					} elseif ( 'per_plugin' === ( $p['access_source'] ?? '' ) ) {
-						++$per_unlocks;
-					}
-				} else {
-					++$counts['locked'];
-				}
-			}
-
-			$cache_remaining = Hub_Manager::get_cache_ttl_remaining();
-			$cache_hours     = floor( $cache_remaining / 3600 );
-			$cache_minutes   = floor( ( $cache_remaining % 3600 ) / 60 );
-			?>
-			<div class="gwp-info-grid">
-				<div class="gwp-info-box">
-					<p class="gwp-info-box__label"><?php esc_html_e( 'Total Plugins', 'gravitywp-license-handler' ); ?></p>
-					<p class="gwp-info-box__value"><?php echo esc_html( $counts['total'] ); ?></p>
-				</div>
-				<div class="gwp-info-box">
-					<p class="gwp-info-box__label"><?php esc_html_e( 'Unlocked', 'gravitywp-license-handler' ); ?></p>
-					<p class="gwp-info-box__value" style="color: #27ae60;"><?php echo esc_html( $counts['unlocked'] ); ?></p>
-					<?php if ( $global_unlocks || $per_unlocks ) : ?>
-						<p class="gwp-info-box__sub">
-							<?php
-							if ( $global_unlocks ) {
-								printf(
-									/* translators: %d: count */
-									esc_html__( '%d via global', 'gravitywp-license-handler' ),
-									$global_unlocks
-								);
-							}
-							if ( $global_unlocks && $per_unlocks ) {
-								echo ' • ';
-							}
-							if ( $per_unlocks ) {
-								printf(
-									/* translators: %d: count */
-									esc_html__( '%d individual', 'gravitywp-license-handler' ),
-									$per_unlocks
-								);
-							}
-							?>
-						</p>
-					<?php endif; ?>
-				</div>
-				<div class="gwp-info-box">
-					<p class="gwp-info-box__label"><?php esc_html_e( 'Locked', 'gravitywp-license-handler' ); ?></p>
-					<p class="gwp-info-box__value" style="color: #dc3232;"><?php echo esc_html( $counts['locked'] ); ?></p>
-				</div>
-				<div class="gwp-info-box">
-					<p class="gwp-info-box__label"><?php esc_html_e( 'Cache Refresh', 'gravitywp-license-handler' ); ?></p>
-					<p class="gwp-info-box__value" style="font-size: 20px;">
-						<?php
-						if ( $cache_remaining > 0 ) {
-							printf( '%dh %dm', (int) $cache_hours, (int) $cache_minutes );
-						} else {
-							esc_html_e( 'Now', 'gravitywp-license-handler' );
-						}
-						?>
-					</p>
-					<p class="gwp-info-box__sub">
-						<a href="<?php echo esc_url( add_query_arg( array( 'page' => self::PAGE_SLUG, 'refresh' => '1' ), admin_url( 'admin.php' ) ) ); ?>" class="gwp-refresh-link" data-gwp-refresh>
-							<span class="dashicons dashicons-update"></span>
-							<?php esc_html_e( 'Refresh now', 'gravitywp-license-handler' ); ?>
-						</a>
-					</p>
-				</div>
-			</div>
-
-			<div class="gwp-card">
-				<div class="gwp-card__header">
-					<h2 class="gwp-card__title">
-						<span class="dashicons dashicons-admin-network"></span>
-						<?php esc_html_e( 'Active Licenses', 'gravitywp-license-handler' ); ?>
-					</h2>
-				</div>
-				<div class="gwp-card__body">
-					<?php
-					$has_any = false;
-
-					if ( ! empty( $global_info ) && ( $global_info['status'] ?? '' ) === 'valid' ) {
-						$has_any = true;
-						self::render_license_row(
-							$global_info['plan_name'] ?? __( 'Global License', 'gravitywp-license-handler' ),
-							$global_info,
-							'global'
-						);
-					}
-
-					foreach ( $per_plugin_info as $slug => $info ) {
-						if ( ( $info['status'] ?? '' ) === 'valid' ) {
-							$has_any = true;
-							$name    = $slug;
-							foreach ( $all_plugins as $p ) {
-								if ( ( $p['slug'] ?? '' ) === $slug ) {
-									$name = $p['name'] ?? $slug;
-									break;
-								}
-							}
-							self::render_license_row( $name, $info, 'per_plugin' );
-						}
-					}
-
-					if ( ! $has_any ) :
-						?>
-						<div class="gwp-empty-state" style="padding: 30px 20px;">
-							<span class="dashicons dashicons-admin-network"></span>
-							<p class="gwp-empty-state__text"><?php esc_html_e( 'No active licenses. Add one in the License Keys tab.', 'gravitywp-license-handler' ); ?></p>
-						</div>
-						<?php
-					endif;
-					?>
-				</div>
-			</div>
-			<?php
-		}
-
-		/**
-		 * Render a single license row in the Overview.
-		 *
-		 * @param string $label  Display label.
-		 * @param array  $info   License info.
-		 * @param string $source 'global' or 'per_plugin'.
-		 * @return void
-		 */
-		private static function render_license_row( $label, $info, $source ) {
-			$plan_type = $info['plan_type'] ?? Plan_Types::UNKNOWN;
-			$expires   = $info['expires'] ?? '';
-			$limit     = $info['license_limit'] ?? 0;
-			$count     = $info['site_count'] ?? 0;
-			?>
-			<div class="gwp-alert gwp-alert--success" style="margin: 8px 0;">
-				<span class="dashicons dashicons-yes-alt"></span>
-				<div class="gwp-alert__content">
-					<p class="gwp-alert__title">
-						<?php echo esc_html( $label ); ?>
-						<span class="gwp-plan-badge gwp-plan-badge--<?php echo esc_attr( $plan_type ); ?>" style="margin-left: 8px;">
-							<?php echo esc_html( Plan_Types::get_label( $plan_type ) ); ?>
-						</span>
-					</p>
-					<p class="gwp-alert__text">
-						<?php
-						printf(
-							/* translators: %1$s: sites, %2$s: limit, %3$s: expires */
-							esc_html__( 'Sites: %1$s / %2$s • Expires: %3$s', 'gravitywp-license-handler' ),
-							esc_html( $count ),
-							esc_html( 0 === (int) $limit ? __( 'Unlimited', 'gravitywp-license-handler' ) : $limit ),
-							esc_html( $expires )
-						);
-						?>
-					</p>
 				</div>
 			</div>
 			<?php
