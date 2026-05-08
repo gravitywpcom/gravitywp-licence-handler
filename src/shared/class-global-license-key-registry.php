@@ -228,6 +228,25 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 
 			wp_enqueue_style( 'gravitywp-licence-ui', $css_url, array( 'dashicons' ), self::$version );
 			wp_enqueue_script( 'gravitywp-licence-ui', $js_url, array(), self::$version, true );
+
+			// Expose AJAX endpoint + canonical nonce + translatable strings to the script.
+			$nonce_action = class_exists( '\GravityWP\Shared\Hub_Ajax' )
+				? Hub_Ajax::NONCE_ACTION
+				: 'gwp_hub_ajax';
+			wp_localize_script(
+				'gravitywp-licence-ui',
+				'gwpHub',
+				array(
+					'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+					'nonce'   => wp_create_nonce( $nonce_action ),
+					'i18n'    => array(
+						'installing'   => __( 'Installing…', 'gravitywp-license-handler' ),
+						'activating'   => __( 'Activating…', 'gravitywp-license-handler' ),
+						'deactivating' => __( 'Deactivating…', 'gravitywp-license-handler' ),
+						'genericError' => __( 'Something went wrong. Please try again.', 'gravitywp-license-handler' ),
+					),
+				)
+			);
 		}
 
 		/**

@@ -974,6 +974,7 @@
 	background: var(--gwp-gray-50);
 	border-top: 1px solid var(--gwp-border);
 	display: flex;
+	flex-wrap: wrap;
 	align-items: center;
 	justify-content: space-between;
 	gap: 8px;
@@ -1326,4 +1327,50 @@
 	.gwp-info-grid {
 		grid-template-columns: 1fr 1fr;
 	}
+}
+
+/* ==========================================================================
+   Hub action buttons (Install / Activate / Deactivate)
+   ========================================================================== */
+
+.gwp-hub-action.is-loading {
+	opacity: 0.6;
+	pointer-events: none;
+}
+
+.gwp-hub-action.is-loading .dashicons {
+	animation: gwp-spin 1s linear infinite;
+}
+
+@keyframes gwp-spin {
+	to { transform: rotate(360deg); }
+}
+
+.gwp-hub-action-status {
+	display: block;
+	flex-basis: 100%;
+	font-size: 12px;
+	margin-top: 6px;
+	min-height: 1em;
+	line-height: 1.4;
+}
+
+.gwp-hub-action-status:empty {
+	display: none;
+}
+
+.gwp-hub-action-status.is-busy {
+	color: var(--gwp-primary);
+}
+
+.gwp-hub-action-status.is-error {
+	color: var(--gwp-danger);
+}
+
+.gwp-plugin-card__status.is-active {
+	color: var(--gwp-success);
+}
+
+.gwp-plugin-card__status.is-inactive {
+	color: var(--gwp-gray-600);
 }

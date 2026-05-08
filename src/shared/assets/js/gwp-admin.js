@@ -16,6 +16,7 @@
 		initTabLinks();
 		initKeyValidation();
 		initRefreshButton();
+		initHubActions();
 	} );
 
 	/**
@@ -165,6 +166,95 @@
 		} else {
 			input.classList.add( 'is-invalid' );
 		}
+	}
+
+	/**
+	 * Initialize Hub action buttons (Install / Activate / Deactivate).
+	 *
+	 * Uses event delegation so dynamically replaced footers keep working
+	 * after an AJAX swap.
+	 */
+	function initHubActions() {
+		document.addEventListener( 'click', function ( e ) {
+			var btn = e.target.closest( '.gwp-hub-action' );
+			if ( ! btn || btn.disabled ) {
+				return;
+			}
+			e.preventDefault();
+			runHubAction( btn );
+		} );
+	}
+
+	/**
+	 * Execute one Hub action (Install / Activate / Deactivate) via admin-ajax.
+	 *
+	 * @param {HTMLButtonElement} btn The clicked action button.
+	 */
+	function runHubAction( btn ) {
+		if ( ! window.gwpHub || ! window.gwpHub.ajaxUrl ) {
+			return;
+		}
+
+		var action = btn.dataset.action; // install | activate | deactivate
+		var labels = ( window.gwpHub && gwpHub.i18n ) || {};
+		var busyText;
+		if ( action === 'install' ) {
+			busyText = labels.installing;
+		} else if ( action === 'activate' ) {
+			busyText = labels.activating;
+		} else {
+			busyText = labels.deactivating;
+		}
+
+		var footer = btn.closest( '.gwp-plugin-card__footer' );
+		var status = footer ? footer.querySelector( '.gwp-hub-action-status' ) : null;
+
+		btn.disabled = true;
+		btn.classList.add( 'is-loading' );
+		if ( status ) {
+			status.textContent = busyText || '';
+			status.className   = 'gwp-hub-action-status is-busy';
+		}
+
+		var body = new URLSearchParams();
+		body.append( 'action', 'gwp_hub_' + action );
+		body.append( 'nonce', btn.dataset.nonce || gwpHub.nonce || '' );
+		body.append( 'slug', btn.dataset.slug || '' );
+		if ( btn.dataset.pluginFile ) {
+			body.append( 'plugin_file', btn.dataset.pluginFile );
+		}
+		if ( btn.dataset.package ) {
+			body.append( 'package', btn.dataset.package );
+		}
+
+		fetch( gwpHub.ajaxUrl, {
+			method: 'POST',
+			credentials: 'same-origin',
+			headers: { 'Accept': 'application/json' },
+			body: body
+		} )
+			.then( function ( res ) {
+				return res.json().catch( function () {
+					throw new Error( labels.genericError || 'Error' );
+				} );
+			} )
+			.then( function ( payload ) {
+				if ( ! payload || ! payload.success ) {
+					var msg = ( payload && payload.data && payload.data.message ) || labels.genericError || 'Error';
+					throw new Error( msg );
+				}
+				if ( footer && payload.data && payload.data.footer_html ) {
+					footer.innerHTML = payload.data.footer_html;
+				}
+			} )
+			.catch( function ( err ) {
+				btn.disabled = false;
+				btn.classList.remove( 'is-loading' );
+				if ( status ) {
+					status.textContent = err && err.message ? err.message : ( labels.genericError || 'Error' );
+					status.className   = 'gwp-hub-action-status is-error';
+				}
+			} );
 	}
 
 	/**

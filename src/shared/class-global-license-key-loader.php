@@ -51,6 +51,7 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Loader' ) ) {
 		 * 1. Plan_Types (constants used by everything)
 		 * 2. Hub_Manager (cache; used by Registry)
 		 * 3. Hub_Page (plugin card render helpers; used by Registry)
+		 * 3b. Hub_Ajax (admin-ajax handlers for Install/Activate/Deactivate)
 		 * 4. Registry (the unified GravityWP page — registers menu)
 		 *
 		 * Since v2.1.0, Hub_Page no longer registers its own menu. Both the
@@ -92,6 +93,15 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Loader' ) ) {
 				require_once $hub_page_file;
 				if ( class_exists( '\GravityWP\Shared\Hub_Page' ) ) {
 					\GravityWP\Shared\Hub_Page::init(); // No-op since v2.1.0.
+				}
+			}
+
+			// 3b. Hub_Ajax — admin-ajax handlers for install/activate/deactivate.
+			$hub_ajax_file = $base_dir . '/class-hub-ajax.php';
+			if ( file_exists( $hub_ajax_file ) ) {
+				require_once $hub_ajax_file;
+				if ( class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
+					\GravityWP\Shared\Hub_Ajax::init();
 				}
 			}
 

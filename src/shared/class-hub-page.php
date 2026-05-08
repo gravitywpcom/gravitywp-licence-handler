@@ -61,25 +61,9 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Page' ) ) {
 				$icon = $plugin['icons']['1x'];
 			}
 
-			// Check installed state and current version.
-			$installed_version = '';
-			$is_installed      = false;
-			$has_update        = false;
-			$plugin_file       = '';
-
-			foreach ( $installed_plugins as $file => $data ) {
-				if ( strpos( $file, $slug ) !== false ) {
-					$is_installed      = true;
-					$installed_version = $data['Version'] ?? '';
-					$plugin_file       = $file;
-					if ( ! empty( $new_version ) && ! empty( $installed_version )
-						&& version_compare( $installed_version, $new_version, '<' )
-					) {
-						$has_update = true;
-					}
-					break;
-				}
-			}
+			$state             = self::compute_install_state( $plugin, $installed_plugins );
+			$installed_version = $state['installed_version'];
+			$has_update        = $state['has_update'];
 
 			// Strip HTML for the card's short description.
 			$description_plain = wp_strip_all_tags( $description );
@@ -127,64 +111,247 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Page' ) ) {
 					</div>
 				</div>
 
-				<div class="gwp-plugin-card__footer">
-					<?php if ( 'unlocked' === $status ) : ?>
-						<?php if ( $is_installed && $has_update && ! empty( $plugin['download_link'] ) && $plugin_file ) : ?>
-							<a
-								href="<?php echo esc_url( wp_nonce_url( self_admin_url( 'update.php?action=upgrade-plugin&plugin=' . rawurlencode( $plugin_file ) ), 'upgrade-plugin_' . $plugin_file ) ); ?>"
-								class="gwp-btn gwp-btn--primary gwp-btn--sm"
-							>
-								<span class="dashicons dashicons-update"></span>
-								<?php esc_html_e( 'Update', 'gravitywp-license-handler' ); ?>
-							</a>
-							<?php if ( $installed_version ) : ?>
-								<span class="gwp-plugin-card__status">v<?php echo esc_html( $installed_version ); ?> → v<?php echo esc_html( $new_version ); ?></span>
-							<?php endif; ?>
-						<?php elseif ( ! $is_installed && ! empty( $plugin['download_link'] ) ) : ?>
-							<a href="<?php echo esc_url( $plugin['download_link'] ); ?>" class="gwp-btn gwp-btn--primary gwp-btn--sm">
-								<span class="dashicons dashicons-download"></span>
-								<?php esc_html_e( 'Download', 'gravitywp-license-handler' ); ?>
-							</a>
-						<?php elseif ( $is_installed && ! $has_update ) : ?>
-							<span class="gwp-plugin-card__status is-up-to-date">
-								<span class="dashicons dashicons-yes"></span>
-								<?php esc_html_e( 'Up to date', 'gravitywp-license-handler' ); ?>
-								<?php if ( $installed_version ) : ?>
-									(v<?php echo esc_html( $installed_version ); ?>)
-								<?php endif; ?>
-							</span>
-						<?php endif; ?>
-					<?php else : ?>
-						<?php
-						// Use purchase_url from catalog if available, else generic pricing page.
-						$purchase_url = ! empty( $plugin['purchase_url'] )
-							? $plugin['purchase_url']
-							: 'https://gravitywp.com/pricing/?utm_source=hub&utm_medium=admin&utm_campaign=upgrade&utm_content=' . rawurlencode( $slug );
-						$is_free = ! empty( $plugin['is_free'] );
-						?>
-						<a
-							href="<?php echo esc_url( $purchase_url ); ?>"
-							target="_blank"
-							rel="noopener"
-							class="gwp-btn gwp-btn--secondary gwp-btn--sm"
-						>
-							<?php if ( $is_free ) : ?>
-								<span class="dashicons dashicons-download"></span>
-								<?php esc_html_e( 'Get Free Plugin', 'gravitywp-license-handler' ); ?>
-							<?php else : ?>
-								<span class="dashicons dashicons-cart"></span>
-								<?php esc_html_e( 'Get This Add-on', 'gravitywp-license-handler' ); ?>
-							<?php endif; ?>
-						</a>
-						<?php if ( ! $is_free && ! empty( $plugin['price'] ) ) : ?>
-							<span class="gwp-plugin-card__status" style="color: #666;">
-								$<?php echo esc_html( number_format( (float) $plugin['price'], 0 ) ); ?>
-							</span>
-						<?php endif; ?>
-					<?php endif; ?>
+				<div class="gwp-plugin-card__footer" data-slug="<?php echo esc_attr( $slug ); ?>">
+					<?php
+					// Helper output is already escaped per branch.
+					echo self::render_card_footer_html( $plugin, $installed_plugins, $status ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+					?>
 				</div>
 			</div>
 			<?php
+		}
+
+		/**
+		 * Render the inner HTML of a plugin card's footer.
+		 *
+		 * Used in two places:
+		 *   1. Initial server render (called from render_plugin_card()).
+		 *   2. AJAX response payload from Hub_Ajax (Install/Activate/Deactivate).
+		 *
+		 * Both must produce identical markup so the in-place footer swap is seamless.
+		 *
+		 * @param array  $plugin            Plugin data from hub.
+		 * @param array  $installed_plugins Installed WP plugins.
+		 * @param string $status            'unlocked' or 'locked'.
+		 * @return string HTML (escaped).
+		 */
+		public static function render_card_footer_html( $plugin, $installed_plugins, $status ) {
+			$slug = $plugin['slug'] ?? '';
+
+			if ( 'unlocked' === $status ) {
+				return self::render_unlocked_footer( $plugin, $installed_plugins, $slug );
+			}
+			return self::render_locked_footer( $plugin, $slug );
+		}
+
+		/**
+		 * Compute install/active state flags from hub + WP plugin data.
+		 *
+		 * @param array $plugin            Plugin data from hub.
+		 * @param array $installed_plugins Installed WP plugins.
+		 * @return array {
+		 *     @type bool   $is_installed      Whether the plugin folder exists in wp-content/plugins.
+		 *     @type bool   $is_active         Whether the plugin is currently active.
+		 *     @type bool   $has_update        Whether a newer version is available.
+		 *     @type string $installed_version Version currently installed (or empty).
+		 *     @type string $plugin_file       Plugin main file path (e.g. 'foo/foo.php') or empty.
+		 * }
+		 */
+		private static function compute_install_state( $plugin, $installed_plugins ) {
+			$slug              = $plugin['slug'] ?? '';
+			$new_version       = $plugin['new_version'] ?? '';
+			$installed_version = '';
+			$is_installed      = false;
+			$has_update        = false;
+			$plugin_file       = '';
+
+			if ( $slug && is_array( $installed_plugins ) ) {
+				foreach ( $installed_plugins as $file => $data ) {
+					if ( false !== strpos( $file, $slug ) ) {
+						$is_installed      = true;
+						$installed_version = $data['Version'] ?? '';
+						$plugin_file       = $file;
+						if ( ! empty( $new_version ) && ! empty( $installed_version )
+							&& version_compare( $installed_version, $new_version, '<' )
+						) {
+							$has_update = true;
+						}
+						break;
+					}
+				}
+			}
+
+			$is_active = false;
+			if ( $is_installed && $plugin_file ) {
+				if ( ! function_exists( 'is_plugin_active' ) ) {
+					require_once ABSPATH . 'wp-admin/includes/plugin.php';
+				}
+				$is_active = is_plugin_active( $plugin_file );
+			}
+
+			return array(
+				'is_installed'      => $is_installed,
+				'is_active'         => $is_active,
+				'has_update'        => $has_update,
+				'installed_version' => $installed_version,
+				'plugin_file'       => $plugin_file,
+			);
+		}
+
+		/**
+		 * Footer HTML for an unlocked plugin (license covers it).
+		 *
+		 * State priority:
+		 *   1. Not installed → Install (AJAX)
+		 *   2. Installed + update available → Update (legacy redirect)
+		 *   3. Installed + active → Deactivate (AJAX)
+		 *   4. Installed + inactive → Activate (AJAX)
+		 *
+		 * @param array  $plugin            Plugin data from hub.
+		 * @param array  $installed_plugins Installed WP plugins.
+		 * @param string $slug              Plugin slug.
+		 * @return string
+		 */
+		private static function render_unlocked_footer( $plugin, $installed_plugins, $slug ) {
+			$state             = self::compute_install_state( $plugin, $installed_plugins );
+			$is_installed      = $state['is_installed'];
+			$is_active         = $state['is_active'];
+			$has_update        = $state['has_update'];
+			$installed_version = $state['installed_version'];
+			$plugin_file       = $state['plugin_file'];
+			$new_version       = $plugin['new_version'] ?? '';
+
+			$package = '';
+			if ( ! empty( $plugin['download_link'] ) ) {
+				$package = $plugin['download_link'];
+			} elseif ( ! empty( $plugin['package'] ) ) {
+				$package = $plugin['package'];
+			}
+
+			$nonce = wp_create_nonce( Hub_Ajax::NONCE_ACTION );
+
+			ob_start();
+			?>
+			<?php if ( $is_installed && $has_update && $plugin_file ) : ?>
+				<a
+					href="<?php echo esc_url( wp_nonce_url( self_admin_url( 'update.php?action=upgrade-plugin&plugin=' . rawurlencode( $plugin_file ) ), 'upgrade-plugin_' . $plugin_file ) ); ?>"
+					class="gwp-btn gwp-btn--primary gwp-btn--sm"
+				>
+					<span class="dashicons dashicons-update"></span>
+					<?php esc_html_e( 'Update', 'gravitywp-license-handler' ); ?>
+				</a>
+				<?php if ( $installed_version ) : ?>
+					<span class="gwp-plugin-card__status">v<?php echo esc_html( $installed_version ); ?> → v<?php echo esc_html( $new_version ); ?></span>
+				<?php endif; ?>
+			<?php elseif ( ! $is_installed && '' !== $package && current_user_can( 'install_plugins' ) ) : ?>
+				<button
+					type="button"
+					class="gwp-btn gwp-btn--primary gwp-btn--sm gwp-hub-action"
+					data-action="install"
+					data-slug="<?php echo esc_attr( $slug ); ?>"
+					data-package="<?php echo esc_url( $package ); ?>"
+					data-nonce="<?php echo esc_attr( $nonce ); ?>"
+				>
+					<span class="dashicons dashicons-download"></span>
+					<?php esc_html_e( 'Install', 'gravitywp-license-handler' ); ?>
+				</button>
+			<?php elseif ( $is_installed && $is_active && $plugin_file && current_user_can( 'activate_plugins' ) ) : ?>
+				<button
+					type="button"
+					class="gwp-btn gwp-btn--secondary gwp-btn--sm gwp-hub-action"
+					data-action="deactivate"
+					data-slug="<?php echo esc_attr( $slug ); ?>"
+					data-plugin-file="<?php echo esc_attr( $plugin_file ); ?>"
+					data-nonce="<?php echo esc_attr( $nonce ); ?>"
+				>
+					<span class="dashicons dashicons-controls-pause"></span>
+					<?php esc_html_e( 'Deactivate', 'gravitywp-license-handler' ); ?>
+				</button>
+				<?php if ( $installed_version ) : ?>
+					<span class="gwp-plugin-card__status is-active">
+						<span class="dashicons dashicons-yes"></span>
+						<?php
+						printf(
+							/* translators: %s: version number */
+							esc_html__( 'Active (v%s)', 'gravitywp-license-handler' ),
+							esc_html( $installed_version )
+						);
+						?>
+					</span>
+				<?php endif; ?>
+			<?php elseif ( $is_installed && ! $is_active && $plugin_file && current_user_can( 'activate_plugins' ) ) : ?>
+				<button
+					type="button"
+					class="gwp-btn gwp-btn--primary gwp-btn--sm gwp-hub-action"
+					data-action="activate"
+					data-slug="<?php echo esc_attr( $slug ); ?>"
+					data-plugin-file="<?php echo esc_attr( $plugin_file ); ?>"
+					data-nonce="<?php echo esc_attr( $nonce ); ?>"
+				>
+					<span class="dashicons dashicons-controls-play"></span>
+					<?php esc_html_e( 'Activate', 'gravitywp-license-handler' ); ?>
+				</button>
+				<?php if ( $installed_version ) : ?>
+					<span class="gwp-plugin-card__status is-inactive">
+						<?php
+						printf(
+							/* translators: %s: version number */
+							esc_html__( 'Installed (v%s)', 'gravitywp-license-handler' ),
+							esc_html( $installed_version )
+						);
+						?>
+					</span>
+				<?php endif; ?>
+			<?php elseif ( $is_installed ) : ?>
+				<span class="gwp-plugin-card__status is-up-to-date">
+					<span class="dashicons dashicons-yes"></span>
+					<?php esc_html_e( 'Up to date', 'gravitywp-license-handler' ); ?>
+					<?php if ( $installed_version ) : ?>
+						(v<?php echo esc_html( $installed_version ); ?>)
+					<?php endif; ?>
+				</span>
+			<?php endif; ?>
+			<span class="gwp-hub-action-status" aria-live="polite"></span>
+			<?php
+			return (string) ob_get_clean();
+		}
+
+		/**
+		 * Footer HTML for a locked plugin (no license access).
+		 *
+		 * @param array  $plugin Plugin data.
+		 * @param string $slug   Plugin slug.
+		 * @return string
+		 */
+		private static function render_locked_footer( $plugin, $slug ) {
+			$purchase_url = ! empty( $plugin['purchase_url'] )
+				? $plugin['purchase_url']
+				: 'https://gravitywp.com/pricing/?utm_source=hub&utm_medium=admin&utm_campaign=upgrade&utm_content=' . rawurlencode( $slug );
+			$is_free = ! empty( $plugin['is_free'] );
+
+			ob_start();
+			?>
+			<a
+				href="<?php echo esc_url( $purchase_url ); ?>"
+				target="_blank"
+				rel="noopener"
+				class="gwp-btn gwp-btn--secondary gwp-btn--sm"
+			>
+				<?php if ( $is_free ) : ?>
+					<span class="dashicons dashicons-download"></span>
+					<?php esc_html_e( 'Get Free Plugin', 'gravitywp-license-handler' ); ?>
+				<?php else : ?>
+					<span class="dashicons dashicons-cart"></span>
+					<?php esc_html_e( 'Get This Add-on', 'gravitywp-license-handler' ); ?>
+				<?php endif; ?>
+			</a>
+			<?php if ( ! $is_free && ! empty( $plugin['price'] ) ) : ?>
+				<span class="gwp-plugin-card__status" style="color: #666;">
+					$<?php echo esc_html( number_format( (float) $plugin['price'], 0 ) ); ?>
+				</span>
+			<?php endif; ?>
+			<?php
+			return (string) ob_get_clean();
 		}
 	}
 }
