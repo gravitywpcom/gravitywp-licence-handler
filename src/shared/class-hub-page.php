@@ -280,17 +280,33 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Page' ) ) {
 					</span>
 				<?php endif; ?>
 			<?php elseif ( $is_installed && ! $is_active && $plugin_file && current_user_can( 'activate_plugins' ) ) : ?>
-				<button
-					type="button"
-					class="gwp-btn gwp-btn--primary gwp-btn--sm gwp-hub-action"
-					data-action="activate"
-					data-slug="<?php echo esc_attr( $slug ); ?>"
-					data-plugin-file="<?php echo esc_attr( $plugin_file ); ?>"
-					data-nonce="<?php echo esc_attr( $nonce ); ?>"
-				>
-					<span class="dashicons dashicons-controls-play"></span>
-					<?php esc_html_e( 'Activate', 'gravitywp-license-handler' ); ?>
-				</button>
+				<div class="gwp-plugin-card__actions">
+					<button
+						type="button"
+						class="gwp-btn gwp-btn--primary gwp-btn--sm gwp-hub-action"
+						data-action="activate"
+						data-slug="<?php echo esc_attr( $slug ); ?>"
+						data-plugin-file="<?php echo esc_attr( $plugin_file ); ?>"
+						data-nonce="<?php echo esc_attr( $nonce ); ?>"
+					>
+						<span class="dashicons dashicons-controls-play"></span>
+						<?php esc_html_e( 'Activate', 'gravitywp-license-handler' ); ?>
+					</button>
+					<?php if ( current_user_can( 'delete_plugins' ) ) : ?>
+						<button
+							type="button"
+							class="gwp-btn gwp-btn--icon gwp-btn--danger gwp-btn--sm gwp-hub-action"
+							data-action="delete"
+							data-slug="<?php echo esc_attr( $slug ); ?>"
+							data-plugin-file="<?php echo esc_attr( $plugin_file ); ?>"
+							data-nonce="<?php echo esc_attr( $nonce ); ?>"
+							title="<?php esc_attr_e( 'Delete plugin', 'gravitywp-license-handler' ); ?>"
+							aria-label="<?php esc_attr_e( 'Delete plugin', 'gravitywp-license-handler' ); ?>"
+						>
+							<span class="dashicons dashicons-trash"></span>
+						</button>
+					<?php endif; ?>
+				</div>
 				<?php if ( $installed_version ) : ?>
 					<span class="gwp-plugin-card__status is-inactive">
 						<?php

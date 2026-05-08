@@ -195,13 +195,24 @@
 			return;
 		}
 
-		var action = btn.dataset.action; // install | activate | deactivate
+		var action = btn.dataset.action; // install | activate | deactivate | delete
 		var labels = ( window.gwpHub && gwpHub.i18n ) || {};
+
+		// Destructive action — confirm before sending.
+		if ( action === 'delete' ) {
+			var confirmMsg = labels.confirmDelete || 'Delete this plugin? This cannot be undone.';
+			if ( ! window.confirm( confirmMsg ) ) {
+				return;
+			}
+		}
+
 		var busyText;
 		if ( action === 'install' ) {
 			busyText = labels.installing;
 		} else if ( action === 'activate' ) {
 			busyText = labels.activating;
+		} else if ( action === 'delete' ) {
+			busyText = labels.deleting;
 		} else {
 			busyText = labels.deactivating;
 		}

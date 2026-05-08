@@ -1374,3 +1374,33 @@
 .gwp-plugin-card__status.is-inactive {
 	color: var(--gwp-gray-600);
 }
+
+.gwp-plugin-card__actions {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.gwp-btn--icon {
+	padding: 6px;
+	min-width: 30px;
+	width: 30px;
+	height: 30px;
+	gap: 0;
+}
+
+.gwp-btn--icon .dashicons {
+	margin: 0;
+}
+
+.gwp-btn--danger {
+	background: #fff;
+	color: var(--gwp-danger);
+	border-color: var(--gwp-gray-300);
+}
+
+.gwp-btn--danger:hover {
+	background: var(--gwp-danger);
+	color: #fff;
+	border-color: var(--gwp-danger);
+}

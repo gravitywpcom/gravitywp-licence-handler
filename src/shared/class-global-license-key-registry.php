@@ -240,10 +240,12 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 					'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 					'nonce'   => wp_create_nonce( $nonce_action ),
 					'i18n'    => array(
-						'installing'   => __( 'Installing…', 'gravitywp-license-handler' ),
-						'activating'   => __( 'Activating…', 'gravitywp-license-handler' ),
-						'deactivating' => __( 'Deactivating…', 'gravitywp-license-handler' ),
-						'genericError' => __( 'Something went wrong. Please try again.', 'gravitywp-license-handler' ),
+						'installing'    => __( 'Installing…', 'gravitywp-license-handler' ),
+						'activating'    => __( 'Activating…', 'gravitywp-license-handler' ),
+						'deactivating'  => __( 'Deactivating…', 'gravitywp-license-handler' ),
+						'deleting'      => __( 'Deleting…', 'gravitywp-license-handler' ),
+						'confirmDelete' => __( 'Delete this plugin and its files? This cannot be undone.', 'gravitywp-license-handler' ),
+						'genericError'  => __( 'Something went wrong. Please try again.', 'gravitywp-license-handler' ),
 					),
 				)
 			);

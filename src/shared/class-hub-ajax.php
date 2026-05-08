@@ -55,6 +55,7 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
 			add_action( 'wp_ajax_gwp_hub_install', array( self::class, 'ajax_install' ) );
 			add_action( 'wp_ajax_gwp_hub_activate', array( self::class, 'ajax_activate' ) );
 			add_action( 'wp_ajax_gwp_hub_deactivate', array( self::class, 'ajax_deactivate' ) );
+			add_action( 'wp_ajax_gwp_hub_delete', array( self::class, 'ajax_delete' ) );
 		}
 
 		// ── Endpoints ─────────────────────────────────────────────────────
@@ -167,6 +168,50 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
 			deactivate_plugins( array( $plugin_file ), true );
 
 			self::respond_success( $slug, $plugin_file, false );
+		}
+
+		/**
+		 * Delete an installed (and inactive) plugin.
+		 *
+		 * Mirrors WP core: refuses to delete an active plugin — caller must
+		 * deactivate first.
+		 *
+		 * @return void
+		 */
+		public static function ajax_delete() {
+			$slug        = self::verify_request( 'delete_plugins' );
+			$plugin_file = self::sanitize_plugin_file( isset( $_POST['plugin_file'] ) ? wp_unslash( $_POST['plugin_file'] ) : '' );
+			if ( '' === $plugin_file ) {
+				self::fail( 400, __( 'Invalid plugin file.', 'gravitywp-license-handler' ) );
+			}
+
+			if ( ! function_exists( 'is_plugin_active' ) ) {
+				require_once ABSPATH . 'wp-admin/includes/plugin.php';
+			}
+			if ( is_plugin_active( $plugin_file ) ) {
+				self::fail( 409, __( 'Deactivate the plugin before deleting it.', 'gravitywp-license-handler' ) );
+			}
+
+			self::load_upgrader_includes();
+			if ( 'direct' !== get_filesystem_method() ) {
+				self::fail(
+					412,
+					__( 'Filesystem requires FTP credentials. Please delete via Plugins → Installed Plugins instead.', 'gravitywp-license-handler' )
+				);
+			}
+
+			$result = delete_plugins( array( $plugin_file ) );
+			if ( is_wp_error( $result ) ) {
+				self::fail( 500, $result->get_error_message() );
+			}
+			if ( false === $result || null === $result ) {
+				self::fail( 500, __( 'Delete failed. Please try again.', 'gravitywp-license-handler' ) );
+			}
+
+			wp_clean_plugins_cache();
+
+			// After delete, plugin_file no longer exists — pass empty so card returns to "Install" state.
+			self::respond_success( $slug, '', false );
 		}
 
 		// ── Helpers ───────────────────────────────────────────────────────
