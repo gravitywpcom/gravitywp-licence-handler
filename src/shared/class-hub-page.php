@@ -138,10 +138,17 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Page' ) ) {
 		public static function render_card_footer_html( $plugin, $installed_plugins, $status ) {
 			$slug = $plugin['slug'] ?? '';
 
-			if ( 'unlocked' === $status ) {
-				return self::render_unlocked_footer( $plugin, $installed_plugins, $slug );
+			switch ( $status ) {
+				case 'unlocked':
+					return self::render_unlocked_footer( $plugin, $installed_plugins, $slug );
+				case 'coming-soon':
+					return self::render_coming_soon_footer( $plugin, $slug );
+				case 'in-development':
+					return self::render_in_development_footer( $plugin, $slug );
+				case 'locked':
+				default:
+					return self::render_locked_footer( $plugin, $slug );
 			}
-			return self::render_locked_footer( $plugin, $slug );
 		}
 
 		/**
@@ -366,6 +373,61 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Page' ) ) {
 					$<?php echo esc_html( number_format( (float) $plugin['price'], 0 ) ); ?>
 				</span>
 			<?php endif; ?>
+			<?php
+			return (string) ob_get_clean();
+		}
+
+		/**
+		 * Footer for plugins with status=coming-soon.
+		 *
+		 * Informational only — no install/activate. If a purchase_url is set,
+		 * link to the product page so users can read about it.
+		 *
+		 * @param array  $plugin Plugin data.
+		 * @param string $slug   Plugin slug.
+		 * @return string
+		 */
+		private static function render_coming_soon_footer( $plugin, $slug ) {
+			$learn_url = ! empty( $plugin['purchase_url'] ) ? $plugin['purchase_url'] : '';
+
+			ob_start();
+			?>
+			<span class="gwp-plugin-card__status is-coming-soon">
+				<span class="dashicons dashicons-clock"></span>
+				<?php esc_html_e( 'Coming soon', 'gravitywp-license-handler' ); ?>
+			</span>
+			<?php if ( $learn_url ) : ?>
+				<a
+					href="<?php echo esc_url( $learn_url ); ?>"
+					target="_blank"
+					rel="noopener"
+					class="gwp-btn gwp-btn--secondary gwp-btn--sm"
+				>
+					<span class="dashicons dashicons-external"></span>
+					<?php esc_html_e( 'Learn more', 'gravitywp-license-handler' ); ?>
+				</a>
+			<?php endif; ?>
+			<?php
+			return (string) ob_get_clean();
+		}
+
+		/**
+		 * Footer for plugins with status=in-development.
+		 *
+		 * Informational only — no install/activate, no external link
+		 * (these aren't ready to be promoted yet).
+		 *
+		 * @param array  $plugin Plugin data.
+		 * @param string $slug   Plugin slug.
+		 * @return string
+		 */
+		private static function render_in_development_footer( $plugin, $slug ) {
+			ob_start();
+			?>
+			<span class="gwp-plugin-card__status is-in-development">
+				<span class="dashicons dashicons-hammer"></span>
+				<?php esc_html_e( 'In development', 'gravitywp-license-handler' ); ?>
+			</span>
 			<?php
 			return (string) ob_get_clean();
 		}
