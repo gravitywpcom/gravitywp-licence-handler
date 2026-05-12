@@ -13,14 +13,28 @@
    ========================================================================== */
 
 .gwp-admin {
-	--gwp-primary: #2271b1;
-	--gwp-primary-dark: #135e96;
+	/* GravityWP brand palette — colors lifted from the astronaut logo. */
+	--gwp-brand-darkest: #28353C; /* deep space navy */
+	--gwp-brand-dark:    #354C58; /* suit shadow */
+	--gwp-brand-deep:    #2A5F7B; /* deep blue */
+	--gwp-brand-primary: #337497; /* primary brand blue */
+	--gwp-brand-mid:     #4A99C4; /* mid blue */
+	--gwp-brand-light:   #65A9CC; /* bright cyan */
+	--gwp-brand-pale:    #83BAD7; /* pale blue */
+	--gwp-brand-tint:    #DEEDF6; /* helmet glass tint */
+	--gwp-brand-flame:   #F26522; /* rocket flame orange */
+	--gwp-brand-spark:   #F98C19; /* rocket spark */
+
+	/* System tokens — re-aliased to brand. */
+	--gwp-primary:      var(--gwp-brand-primary);
+	--gwp-primary-dark: var(--gwp-brand-darkest);
+	--gwp-accent:       var(--gwp-brand-flame);
 	--gwp-success: #27ae60;
 	--gwp-warning: #f39c12;
-	--gwp-danger: #dc3232;
-	--gwp-info: #3498db;
-	--gwp-purple: #8e44ad;
-	--gwp-gray-50: #f8f9fa;
+	--gwp-danger:  #dc3232;
+	--gwp-info:    var(--gwp-brand-light);
+	--gwp-purple:  #8e44ad;
+	--gwp-gray-50:  #f8f9fa;
 	--gwp-gray-100: #f1f3f5;
 	--gwp-gray-200: #e9ecef;
 	--gwp-gray-300: #dee2e6;
@@ -33,9 +47,10 @@
 	--gwp-border: #dcdcde;
 	--gwp-radius: 8px;
 	--gwp-radius-sm: 4px;
-	--gwp-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
-	--gwp-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
-	--gwp-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.04);
+	--gwp-shadow-sm: 0 1px 2px rgba(40, 53, 60, 0.05);
+	--gwp-shadow:    0 1px 3px rgba(40, 53, 60, 0.10), 0 1px 2px rgba(40, 53, 60, 0.05);
+	--gwp-shadow-md: 0 4px 6px rgba(40, 53, 60, 0.08), 0 2px 4px rgba(40, 53, 60, 0.05);
+	--gwp-shadow-glow: 0 0 0 3px rgba(101, 169, 204, 0.18);
 	--gwp-transition: all 0.15s ease;
 }
 
@@ -67,29 +82,67 @@
 	box-shadow: 0 10px 40px -12px rgba(0, 0, 0, 0.18), 0 4px 16px -8px rgba(0, 0, 0, 0.10);
 }
 
-/* Hero state — License active (green-blue gradient) */
+/* Hero state — License active (deep space → cyan, brand palette) */
 .gwp-hero--active {
-	background: linear-gradient(135deg, #1a5fb4 0%, #2d8f5f 100%);
+	background:
+		linear-gradient(135deg, var(--gwp-brand-darkest) 0%, var(--gwp-brand-deep) 45%, var(--gwp-brand-primary) 75%, var(--gwp-brand-light) 100%);
 }
 
 /* Hero state — Empty (no key, neutral elegant) */
 .gwp-hero--empty {
-	background: linear-gradient(135deg, #2c3e50 0%, #4a6278 100%);
+	background: linear-gradient(135deg, var(--gwp-brand-darkest) 0%, var(--gwp-brand-dark) 100%);
 }
 
-/* Hero state — Invalid (red-orange) */
+/* Hero state — Invalid (orange flame on dark, brand-accented) */
 .gwp-hero--invalid {
-	background: linear-gradient(135deg, #b91c1c 0%, #d97706 100%);
+	background:
+		linear-gradient(135deg, var(--gwp-brand-darkest) 0%, var(--gwp-brand-dark) 60%, var(--gwp-brand-flame) 100%);
 }
 
-/* Decorative background pattern */
+/* Decorative background pattern — subtle starfield + glow. */
 .gwp-hero__bg {
 	position: absolute;
 	inset: 0;
 	pointer-events: none;
 	background-image:
-		radial-gradient(circle at 85% 15%, rgba(255, 255, 255, 0.12) 0%, transparent 45%),
-		radial-gradient(circle at 15% 85%, rgba(255, 255, 255, 0.08) 0%, transparent 45%);
+		radial-gradient(circle at 85% 15%, rgba(255, 255, 255, 0.14) 0%, transparent 45%),
+		radial-gradient(circle at 15% 85%, rgba(101, 169, 204, 0.18) 0%, transparent 45%),
+		radial-gradient(1px 1px at 20% 30%, rgba(255, 255, 255, 0.45) 50%, transparent 100%),
+		radial-gradient(1px 1px at 60% 70%, rgba(255, 255, 255, 0.30) 50%, transparent 100%),
+		radial-gradient(1px 1px at 35% 80%, rgba(255, 255, 255, 0.40) 50%, transparent 100%),
+		radial-gradient(1px 1px at 75% 25%, rgba(255, 255, 255, 0.35) 50%, transparent 100%),
+		radial-gradient(1.5px 1.5px at 50% 50%, rgba(255, 255, 255, 0.25) 50%, transparent 100%);
+}
+
+/* Astronaut illustration — floats on the right of the hero, rotated subtly.
+   Sits behind the hero content (text/stats stay readable) and is hidden on
+   narrow screens to avoid crowding. */
+.gwp-hero__astronaut {
+	position: absolute;
+	top: 50%;
+	right: 32px;
+	height: 130%;
+	max-height: 280px;
+	width: auto;
+	transform: translateY(-50%) rotate(8deg);
+	opacity: 0.92;
+	filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.35));
+	pointer-events: none;
+	z-index: 0;
+	animation: gwp-astronaut-float 6s ease-in-out infinite;
+}
+
+@keyframes gwp-astronaut-float {
+	0%, 100% { transform: translateY(-50%) rotate(8deg); }
+	50%      { transform: translateY(calc(-50% - 8px)) rotate(10deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.gwp-hero__astronaut { animation: none; }
+}
+
+@media (max-width: 900px) {
+	.gwp-hero__astronaut { display: none; }
 }
 
 .gwp-hero__bg::before {
@@ -105,7 +158,12 @@
 
 .gwp-hero__content {
 	position: relative;
-	z-index: 1;
+	z-index: 2;
+	padding-right: 220px; /* leave room for the astronaut on the right */
+}
+
+@media (max-width: 900px) {
+	.gwp-hero__content { padding-right: 0; }
 }
 
 .gwp-hero__brand {

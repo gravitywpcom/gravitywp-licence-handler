@@ -224,8 +224,26 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Page' ) ) {
 			$plugin_file       = '';
 
 			if ( $slug && is_array( $installed_plugins ) ) {
+				// Pre-compute normalized slug. Handles "gravitywpadvancednumberfield"
+				// (catalog) ↔ "gravitywp-advanced-number-field/foo.php" (folder)
+				// where strpos misses but fuzzy alphanumeric match succeeds.
+				$slug_norm = preg_replace( '/[^a-z0-9]/i', '', strtolower( $slug ) );
+
 				foreach ( $installed_plugins as $file => $data ) {
+					$matched = false;
 					if ( false !== strpos( $file, $slug ) ) {
+						$matched = true;
+					} elseif ( '' !== $slug_norm ) {
+						$folder = strstr( $file, '/', true );
+						if ( false !== $folder && '' !== $folder ) {
+							$folder_norm = preg_replace( '/[^a-z0-9]/i', '', strtolower( $folder ) );
+							if ( $folder_norm === $slug_norm ) {
+								$matched = true;
+							}
+						}
+					}
+
+					if ( $matched ) {
 						$is_installed      = true;
 						$installed_version = $data['Version'] ?? '';
 						$plugin_file       = $file;

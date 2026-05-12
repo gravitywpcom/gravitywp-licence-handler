@@ -463,9 +463,18 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 			$cache_hours     = (int) floor( $cache_remaining / 3600 );
 			$cache_minutes   = (int) floor( ( $cache_remaining % 3600 ) / 60 );
 			$refresh_url     = add_query_arg( array( 'page' => self::PAGE_SLUG, 'refresh' => '1' ), admin_url( 'admin.php' ) );
+
+			$astronaut_url = '';
+			$base_url      = self::get_assets_base_url();
+			if ( $base_url ) {
+				$astronaut_url = $base_url . 'assets/img/astronaut.svg';
+			}
 			?>
 			<div class="gwp-hero gwp-hero--<?php echo esc_attr( $state ); ?>">
 				<div class="gwp-hero__bg" aria-hidden="true"></div>
+				<?php if ( $astronaut_url ) : ?>
+					<img class="gwp-hero__astronaut" src="<?php echo esc_url( $astronaut_url ); ?>" alt="" aria-hidden="true" />
+				<?php endif; ?>
 
 				<div class="gwp-hero__content">
 					<div class="gwp-hero__brand">
