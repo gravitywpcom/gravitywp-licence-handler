@@ -44,7 +44,7 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
 		 *
 		 * @var string
 		 */
-		const CACHE_VERSION = '2.2.0';
+		const CACHE_VERSION = '2.3.0';
 
 		/**
 		 * Cache TTL in seconds (12 hours).
@@ -227,14 +227,11 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
 			// Remove empty keys.
 			$plugin_license_keys = array_filter( $plugin_license_keys );
 
-			// No keys at all — return empty structure without hitting API.
-			if ( empty( $global_key ) && empty( $plugin_license_keys ) ) {
-				delete_transient( self::LOCK_KEY );
-				$empty = self::get_empty_response();
-				self::save_cache( $empty );
-				return $empty;
-			}
-
+			// Note: even with no keys we still hit the API. The server returns
+			// the public catalog (all plugins with has_access flags) so the Hub
+			// can render free plugins as installable and premium plugins with
+			// "Get This Add-on" CTAs — much better UX than an empty page that
+			// forces a license-key entry before showing any value.
 			$body = array(
 				'license_url' => home_url(),
 			);
