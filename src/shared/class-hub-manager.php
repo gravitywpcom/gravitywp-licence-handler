@@ -136,31 +136,39 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
 			$global_key    = get_option( self::GLOBAL_KEY_OPTION, '' );
 			$first_key_set = false;
 
+			$migrated_slugs = array();
+
 			foreach ( $legacy_keys as $slug => $key ) {
 				// Don't overwrite keys the user already set in the new UI.
 				if ( ! empty( $current_keys[ $slug ] ) ) {
-					continue;
-				}
-
-				// If the legacy key is the same as the global key, skip it
-				// (already covered by global, no need to duplicate).
-				if ( ! empty( $global_key ) && $key === $global_key ) {
+					// Already in new storage — mark as migrated so we never
+					// scan this legacy key again.
+					$migrated_slugs[] = $slug;
 					continue;
 				}
 
 				// If no global key exists and this is the first legacy key found,
 				// promote it to global (same as the original migration logic).
+				// We still do this branch so single-add-on users coming from
+				// v2.0.x get their first key promoted automatically.
 				if ( empty( $global_key ) && ! $first_key_set ) {
 					update_option( self::GLOBAL_KEY_OPTION, $key );
-					$global_key    = $key;
-					$first_key_set = true;
-					$changed       = true;
+					$global_key       = $key;
+					$first_key_set    = true;
+					$changed          = true;
+					$migrated_slugs[] = $slug;
 					continue;
 				}
 
-				// Store as individual plugin key.
+				// Store as individual plugin key — ALWAYS, even when the value
+				// matches the global key. Previously we skipped duplicates, but
+				// that hid legacy keys from the new UI which confused users who
+				// had set per-plugin keys in v2.0.x addon settings. PaddlePress
+				// activate() is idempotent on (license_key, site_url), so a key
+				// that matches Global doesn't consume an extra activation slot.
 				$current_keys[ $slug ] = $key;
 				$changed               = true;
+				$migrated_slugs[]      = $slug;
 			}
 
 			if ( $changed ) {
@@ -169,6 +177,15 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
 				}
 				// Force cache refresh so the hub request includes the new keys.
 				delete_option( self::CACHE_KEY );
+			}
+
+			// Mark all processed slugs as migrated. Setting this flag AFTER
+			// update_option ensures we never lose data — if the save above
+			// failed for some reason, the flag isn't set and we'll retry next
+			// page load. Once set, scan_legacy_addon_keys() filters this slug
+			// out, so deleting the key from the new UI won't bring it back.
+			foreach ( $migrated_slugs as $slug ) {
+				update_option( 'gravitywp_migrated_' . $slug, 1, false );
 			}
 		}
 
@@ -274,7 +291,57 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
 			}
 
 			self::save_cache( $data );
+
+			// One-time re-keying: 8 of our add-ons use a legacy no-dash $_slug
+			// in their GF addon class ('gravitywpfieldtoentries' etc.), so the
+			// legacy-migration step above stores their per-plugin keys under
+			// that legacy slug. The UI and the rest of the system, however,
+			// use the canonical slug (= github_name, e.g. 'gravitywp-field-to-
+			// entries'). Now that we have the hub data, we know the
+			// download_tag → canonical slug mapping and can move the keys.
+			self::normalize_plugin_keys_to_canonical( $data );
+
 			return $data;
+		}
+
+		/**
+		 * Re-key gravitywp_plugin_license_keys so each entry is stored under
+		 * the canonical slug (= github_name) instead of the legacy GF addon
+		 * $_slug / PaddlePress download_tag. Idempotent — safe to run on every
+		 * hub fetch. Once all keys are canonical, this becomes a no-op.
+		 *
+		 * @param array $hub_data Hub response data.
+		 * @return void
+		 */
+		private static function normalize_plugin_keys_to_canonical( $hub_data ) {
+			if ( empty( $hub_data['plugins'] ) || ! is_array( $hub_data['plugins'] ) ) {
+				return;
+			}
+
+			$current_keys = get_option( self::PLUGIN_KEYS_OPTION, array() );
+			if ( ! is_array( $current_keys ) || empty( $current_keys ) ) {
+				return;
+			}
+
+			$changed = false;
+			foreach ( $hub_data['plugins'] as $plugin ) {
+				$canonical = $plugin['slug'] ?? '';
+				$legacy    = $plugin['download_tag'] ?? '';
+				if ( empty( $canonical ) || empty( $legacy ) || $canonical === $legacy ) {
+					continue;
+				}
+				// Move the key only when it exists under legacy AND the canonical
+				// slot is still empty (don't overwrite user-set canonical keys).
+				if ( ! empty( $current_keys[ $legacy ] ) && empty( $current_keys[ $canonical ] ) ) {
+					$current_keys[ $canonical ] = $current_keys[ $legacy ];
+					unset( $current_keys[ $legacy ] );
+					$changed = true;
+				}
+			}
+
+			if ( $changed ) {
+				update_option( self::PLUGIN_KEYS_OPTION, array_filter( $current_keys ) );
+			}
 		}
 
 		/**
@@ -539,6 +606,19 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
 							$keys[ $slug ] = $legacy_key;
 						}
 					}
+				}
+			}
+
+			// Filter out slugs that have ALREADY been migrated by either
+			// LicenseHandler::maybe_migrate_legacy_license_key() (sets flag for
+			// active plugins) or by a previous run of this Hub_Manager migration
+			// (sets the same flag below). Without this filter, a user who
+			// deletes a migrated per-plugin key from the new UI would see it
+			// re-appear on the next page load, because we'd scan the old GF
+			// settings again and re-migrate.
+			foreach ( array_keys( $keys ) as $slug ) {
+				if ( get_option( 'gravitywp_migrated_' . $slug, false ) ) {
+					unset( $keys[ $slug ] );
 				}
 			}
 
