@@ -391,8 +391,19 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 				<div class="gwp-tab-panel" data-gwp-panel="license-keys" role="tabpanel">
 					<form method="post" action="options.php">
 						<?php settings_fields( 'gravitywp_settings_group' ); ?>
+						<?php
+						// Individual keys are only meaningful for paid add-ons. Free plugins
+						// update via wp.org and never use a license key, so they're hidden
+						// from the per-plugin keys card.
+						$paid_plugins = array_filter(
+							$all_plugins,
+							static function ( $p ) {
+								return empty( $p['is_free'] );
+							}
+						);
+						?>
 						<?php self::render_global_license_card( $global_key, $global_info, $unlocked ); ?>
-						<?php self::render_individual_keys_card( $plugin_keys, $per_plugin_info, $all_plugins ); ?>
+						<?php self::render_individual_keys_card( $plugin_keys, $per_plugin_info, $paid_plugins ); ?>
 						<p class="gwp-form-actions">
 							<?php submit_button( __( 'Save License Keys', 'gravitywp-license-handler' ), 'primary large', 'submit', false, array( 'class' => 'button button-primary button-large' ) ); ?>
 						</p>
@@ -540,18 +551,6 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 						<span class="dashicons dashicons-update"></span>
 						<span class="screen-reader-text"><?php esc_html_e( 'Refresh', 'gravitywp-license-handler' ); ?></span>
 					</a>
-					<?php if ( $cache_remaining > 0 ) : ?>
-						<div class="gwp-hero__cache-info">
-							<?php
-							printf(
-								/* translators: %1$d: hours, %2$d: minutes */
-								esc_html__( 'Updated • next refresh in %1$dh %2$dm', 'gravitywp-license-handler' ),
-								$cache_hours,
-								$cache_minutes
-							);
-							?>
-						</div>
-					<?php endif; ?>
 					<div class="gwp-hero__version">v<?php echo esc_html( self::$version ); ?></div>
 				</div>
 			</div>
