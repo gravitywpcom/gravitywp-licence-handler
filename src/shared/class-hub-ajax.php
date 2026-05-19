@@ -28,6 +28,7 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
 			self::$registered = true;
 
 			add_action( 'wp_ajax_gwp_hub_install', array( self::class, 'ajax_install' ) );
+			add_action( 'wp_ajax_gwp_hub_update', array( self::class, 'ajax_update' ) );
 			add_action( 'wp_ajax_gwp_hub_activate', array( self::class, 'ajax_activate' ) );
 			add_action( 'wp_ajax_gwp_hub_deactivate', array( self::class, 'ajax_deactivate' ) );
 			add_action( 'wp_ajax_gwp_hub_delete', array( self::class, 'ajax_delete' ) );
@@ -168,6 +169,141 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
 			self::log( 'install success', array( 'plugin_file' => $plugin_file ) );
 
 			self::respond_success( $slug, $plugin_file, false );
+		}
+
+		public static function ajax_update() {
+			$slug        = self::verify_request( 'update_plugins' );
+			$plugin_file = self::sanitize_plugin_file( isset( $_POST['plugin_file'] ) ? wp_unslash( $_POST['plugin_file'] ) : '' );
+			if ( '' === $plugin_file ) {
+				self::fail( 400, __( 'Invalid plugin file.', 'gravitywp-license-handler' ) );
+			}
+
+			self::log( 'update start', array( 'slug' => $slug, 'plugin_file' => $plugin_file, 'user_id' => get_current_user_id() ) );
+
+			$plugin = Hub_Manager::get_plugin_data( $slug );
+			self::log( 'plugin fetched', array(
+				'slug'            => $slug,
+				'has_access'      => ! empty( $plugin['has_access'] ),
+				'is_free'         => ! empty( $plugin['is_free'] ),
+				'access_source'   => $plugin['access_source'] ?? null,
+				'download_link'   => $plugin['download_link'] ?? null,
+				'github_name'     => $plugin['github_name'] ?? null,
+				'new_version'     => $plugin['new_version'] ?? null,
+			) );
+
+			if ( ! $plugin || empty( $plugin['has_access'] ) ) {
+				self::fail( 403, __( 'License does not cover this plugin.', 'gravitywp-license-handler' ) );
+			}
+
+			$package = '';
+			if ( ! empty( $plugin['download_link'] ) ) {
+				$package = $plugin['download_link'];
+			} elseif ( ! empty( $plugin['package'] ) ) {
+				$package = $plugin['package'];
+			}
+			if ( empty( $package ) ) {
+				self::fail( 400, __( 'Download URL missing from hub response.', 'gravitywp-license-handler' ) );
+			}
+
+			// Self-heal stale catalog URLs (same as install).
+			if ( false !== strpos( $package, '.latest-stable.zip' ) ) {
+				$package = str_replace( '.latest-stable.zip', '.zip', $package );
+			}
+
+			// wp.org canonical override for free plugins.
+			if ( ! empty( $plugin['is_free'] ) ) {
+				$wporg_slug = ! empty( $plugin['github_name'] ) ? $plugin['github_name'] : $slug;
+				$canonical  = self::fetch_wporg_download_link( $wporg_slug );
+				if ( '' !== $canonical ) {
+					$package = $canonical;
+				}
+			}
+
+			self::log( 'package resolved', array(
+				'slug'    => $slug,
+				'package' => $package,
+				'is_free' => ! empty( $plugin['is_free'] ),
+			) );
+
+			if ( ! function_exists( 'get_plugins' ) ) {
+				require_once ABSPATH . 'wp-admin/includes/plugin.php';
+			}
+
+			// Idempotent: if installed version already matches/exceeds the
+			// hub's new_version, treat as success without running the upgrader.
+			$installed_plugins = get_plugins();
+			$installed_version = isset( $installed_plugins[ $plugin_file ]['Version'] ) ? (string) $installed_plugins[ $plugin_file ]['Version'] : '';
+			$target_version    = isset( $plugin['new_version'] ) ? (string) $plugin['new_version'] : '';
+			if ( '' === $installed_version ) {
+				self::fail( 404, __( 'Plugin is not installed.', 'gravitywp-license-handler' ) );
+			}
+			if ( '' !== $target_version && version_compare( $installed_version, $target_version, '>=' ) ) {
+				self::log( 'already current', array( 'installed' => $installed_version, 'target' => $target_version ) );
+				self::respond_success( $slug, $plugin_file, is_plugin_active( $plugin_file ) );
+				return;
+			}
+
+			self::load_upgrader_includes();
+
+			if ( 'direct' !== get_filesystem_method() ) {
+				self::fail( 412, __( 'Filesystem requires FTP credentials. Please update via Plugins → Installed Plugins instead.', 'gravitywp-license-handler' ) );
+			}
+
+			$lock_key = 'gwp_hub_lock_' . md5( $slug );
+			if ( get_transient( $lock_key ) ) {
+				self::fail( 429, __( 'Operation already in progress.', 'gravitywp-license-handler' ) );
+			}
+			set_transient( $lock_key, 1, 60 );
+
+			$skin     = new \WP_Ajax_Upgrader_Skin();
+			$upgrader = new \Plugin_Upgrader( $skin );
+
+			// Run the upgrader directly with our package URL — bypasses the
+			// update_plugins transient (which the legacy bundled pluginUpdater
+			// poisons with a missing `package` field on customer sites running
+			// older addons).
+			$result = $upgrader->run( array(
+				'package'           => $package,
+				'destination'       => WP_PLUGIN_DIR,
+				'clear_destination' => true,
+				'clear_working'     => true,
+				'hook_extra'        => array(
+					'plugin' => $plugin_file,
+					'type'   => 'plugin',
+					'action' => 'update',
+				),
+			) );
+
+			delete_transient( $lock_key );
+
+			self::log( 'upgrader done', array(
+				'package'   => $package,
+				'is_wp_err' => is_wp_error( $result ),
+				'skin_err'  => ( is_wp_error( $skin->result ) ) ? $skin->result->get_error_code() : null,
+				'skin_data' => ( is_wp_error( $skin->result ) ) ? $skin->result->get_error_data() : null,
+			) );
+
+			if ( is_wp_error( $skin->result ) ) {
+				self::fail( 500, self::format_wp_error( $skin->result ) );
+			}
+			$skin_errors = method_exists( $skin, 'get_errors' ) ? $skin->get_errors() : null;
+			if ( $skin_errors instanceof \WP_Error && $skin_errors->has_errors() ) {
+				self::fail( 500, self::format_wp_error( $skin_errors ) );
+			}
+			if ( is_wp_error( $result ) ) {
+				self::fail( 500, self::format_wp_error( $result ) );
+			}
+			if ( false === $result || null === $result ) {
+				self::fail( 500, __( 'Update failed. Please try again.', 'gravitywp-license-handler' ) );
+			}
+
+			wp_clean_plugins_cache();
+			Hub_Manager::clear_cache();
+
+			$is_active = is_plugin_active( $plugin_file );
+			self::log( 'update success', array( 'plugin_file' => $plugin_file, 'is_active' => $is_active ) );
+
+			self::respond_success( $slug, $plugin_file, $is_active );
 		}
 
 		public static function ajax_activate() {

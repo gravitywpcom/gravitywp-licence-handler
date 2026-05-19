@@ -241,6 +241,7 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 					'nonce'   => wp_create_nonce( $nonce_action ),
 					'i18n'    => array(
 						'installing'    => __( 'Installing…', 'gravitywp-license-handler' ),
+						'updating'      => __( 'Updating…', 'gravitywp-license-handler' ),
 						'activating'    => __( 'Activating…', 'gravitywp-license-handler' ),
 						'deactivating'  => __( 'Deactivating…', 'gravitywp-license-handler' ),
 						'deleting'      => __( 'Deleting…', 'gravitywp-license-handler' ),

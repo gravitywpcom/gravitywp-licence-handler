@@ -308,14 +308,19 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Page' ) ) {
 
 			ob_start();
 			?>
-			<?php if ( $is_installed && $has_update && $plugin_file ) : ?>
-				<a
-					href="<?php echo esc_url( wp_nonce_url( self_admin_url( 'update.php?action=upgrade-plugin&plugin=' . rawurlencode( $plugin_file ) ), 'upgrade-plugin_' . $plugin_file ) ); ?>"
-					class="gwp-btn gwp-btn--primary gwp-btn--sm"
+			<?php if ( $is_installed && $has_update && $plugin_file && current_user_can( 'update_plugins' ) && '' !== $package ) : ?>
+				<button
+					type="button"
+					class="gwp-btn gwp-btn--primary gwp-btn--sm gwp-hub-action"
+					data-action="update"
+					data-slug="<?php echo esc_attr( $slug ); ?>"
+					data-plugin-file="<?php echo esc_attr( $plugin_file ); ?>"
+					data-package="<?php echo esc_url( $package ); ?>"
+					data-nonce="<?php echo esc_attr( $nonce ); ?>"
 				>
 					<span class="dashicons dashicons-update"></span>
 					<?php esc_html_e( 'Update', 'gravitywp-license-handler' ); ?>
-				</a>
+				</button>
 				<?php if ( $installed_version ) : ?>
 					<span class="gwp-plugin-card__status">v<?php echo esc_html( $installed_version ); ?> → v<?php echo esc_html( $new_version ); ?></span>
 				<?php endif; ?>

@@ -209,6 +209,8 @@
 		var busyText;
 		if ( action === 'install' ) {
 			busyText = labels.installing;
+		} else if ( action === 'update' ) {
+			busyText = labels.updating;
 		} else if ( action === 'activate' ) {
 			busyText = labels.activating;
 		} else if ( action === 'delete' ) {
