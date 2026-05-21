@@ -90,6 +90,13 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
 			if ( ! $force_refresh ) {
 				$cached = self::get_cache();
 				if ( false !== $cached ) {
+					// Run the misplaced-global-key relocator against cached
+					// data too — otherwise a user sitting on a 12-hour cache
+					// of the misleading "single_addon in Global" state would
+					// only get the fix after the cache expires or they hit
+					// the Refresh button. Idempotent: once the Global option
+					// is empty, this method returns immediately.
+					self::maybe_relocate_misplaced_global_key( $cached );
 					return $cached;
 				}
 			}
@@ -244,13 +251,30 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
 			// Remove empty keys.
 			$plugin_license_keys = array_filter( $plugin_license_keys );
 
-			// Note: even with no keys we still hit the API. The server returns
-			// the public catalog (all plugins with has_access flags) so the Hub
-			// can render free plugins as installable and premium plugins with
-			// "Get This Add-on" CTAs — much better UX than an empty page that
-			// forces a license-key entry before showing any value.
+			// Pre-flight: build a request body that NEVER trips the hub's REST
+			// validator (rest_missing_callback_param / rest_invalid_param).
+			//
+			// - license_url is REQUIRED by the hub schema. home_url() returns
+			//   '' on installs that haven't set the siteurl option; defaulting
+			//   to a non-empty placeholder keeps the request well-formed even
+			//   in that edge case. The hub uses it only as an activation
+			//   identifier, so a placeholder is safe.
+			// - plugin_license_keys is typed `object` server-side. We only
+			//   include the key when populated AND assoc-keyed, so wp_remote_post's
+			//   form encoding produces `plugin_license_keys[slug]=key` (which
+			//   PHP's REST parser deserializes as an object). Numeric or empty
+			//   arrays serialize as `plugin_license_keys[0]=...` and trigger
+			//   rest_invalid_param — see Recipe H in the plan.
+			$license_url = home_url();
+			if ( empty( $license_url ) ) {
+				$license_url = site_url();
+			}
+			if ( empty( $license_url ) ) {
+				$license_url = 'https://unknown.local';
+			}
+
 			$body = array(
-				'license_url' => home_url(),
+				'license_url' => $license_url,
 			);
 
 			if ( ! empty( $global_key ) ) {
@@ -258,7 +282,17 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
 			}
 
 			if ( ! empty( $plugin_license_keys ) ) {
-				$body['plugin_license_keys'] = $plugin_license_keys;
+				// Belt & braces: drop any non-string-keyed entries that would
+				// serialize as a numeric-indexed array on the wire.
+				$assoc_only = array();
+				foreach ( $plugin_license_keys as $slug => $key ) {
+					if ( is_string( $slug ) && '' !== $slug ) {
+						$assoc_only[ $slug ] = $key;
+					}
+				}
+				if ( ! empty( $assoc_only ) ) {
+					$body['plugin_license_keys'] = $assoc_only;
+				}
 			}
 
 			$args = array(
@@ -270,25 +304,62 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
 			$response = wp_remote_post( self::$hub_api_url, $args );
 			delete_transient( self::LOCK_KEY );
 
+			// Classify every failure mode through Api_Error_Handler so the UI
+			// can surface a specific, actionable message (Cloudflare blocked,
+			// network timeout, HTTP 5xx, etc.) instead of silently rendering
+			// an empty page.
 			if ( is_wp_error( $response ) ) {
-				return self::return_stale_or_empty();
+				$code = Api_Error_Handler::classify_wp_error( $response );
+				return self::return_stale_or_empty(
+					array(
+						'code'    => $code,
+						'message' => Api_Error_Handler::message( $code ),
+					)
+				);
 			}
 
-			$code = wp_remote_retrieve_response_code( $response );
-			$raw  = wp_remote_retrieve_body( $response );
+			$http_code = wp_remote_retrieve_response_code( $response );
+			$raw       = wp_remote_retrieve_body( $response );
 
-			if ( 403 === $code && strpos( strtolower( $raw ), 'cloudflare' ) !== false ) {
-				return self::return_stale_or_empty();
-			}
-
-			if ( 200 !== $code ) {
-				return self::return_stale_or_empty();
+			if ( 200 !== (int) $http_code ) {
+				$code = Api_Error_Handler::classify_http_response( $http_code, $raw );
+				// http_5xx / http_4xx carry the status code in their template.
+				$args = in_array( $code, array( 'http_5xx', 'http_4xx' ), true )
+					? array( (int) $http_code )
+					: array();
+				return self::return_stale_or_empty(
+					array(
+						'code'    => $code,
+						'message' => Api_Error_Handler::message( $code, $args ),
+						'status'  => (int) $http_code,
+					)
+				);
 			}
 
 			$data = json_decode( $raw, true );
 			if ( ! is_array( $data ) ) {
-				return self::return_stale_or_empty();
+				return self::return_stale_or_empty(
+					array(
+						'code'    => 'malformed_response',
+						'message' => Api_Error_Handler::message( 'malformed_response' ),
+					)
+				);
 			}
+
+			// Remember each key's plan_type so the Global-field validator can
+			// recognize a Single Add-on key on paste. Best-effort: only keys
+			// whose hub response is a valid license get remembered.
+			self::remember_key_plan_types( $global_key, $plugin_license_keys, $data );
+
+			// Auto-relocate: a Single Add-on key in the Global field is a
+			// no-op (it unlocks zero plugins via the global path because
+			// PaddlePress only grants per-product permission for single_addon
+			// plans). Detect this and move the key to the matching per-plugin
+			// row automatically — far more professional than leaving the user
+			// stuck with a warning and no way out short of manual cleanup.
+			// Mutates $data in-place so the very next render reflects the new
+			// state without a second hub round-trip.
+			self::maybe_relocate_misplaced_global_key( $data );
 
 			self::save_cache( $data );
 
@@ -302,6 +373,189 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
 			self::normalize_plugin_keys_to_canonical( $data );
 
 			return $data;
+		}
+
+		/**
+		 * Name of the one-shot transient that carries a relocation notice
+		 * from the Hub_Manager into the Registry's admin notices. Stores
+		 * ['slug' => string, 'name' => string] for one page-load.
+		 *
+		 * @var string
+		 */
+		const RELOCATED_NOTICE_TRANSIENT = 'gwp_global_key_relocated';
+
+		/**
+		 * If the saved Global License Key is actually a Single Add-on key,
+		 * move it to the matching row under Individual Plugin Keys.
+		 *
+		 * The Global field is for All Access / List Add-ons / Agency plans.
+		 * A Single Add-on key in that slot unlocks zero plugins because the
+		 * hub's global-access check uses `has_download_permission` against
+		 * `download_post_id`, which single_addon plans only grant for one
+		 * product. Rather than rendering "✓ Active … Unlocks 0 plugins" (a
+		 * self-contradicting message), or asking the user to clean up
+		 * manually, we relocate the key and tell them via an admin notice.
+		 *
+		 * Mutation is in-place on $data so the current render sees the new
+		 * state immediately — no second hub call, no two-page-load settle.
+		 *
+		 * @param array $data Decoded hub response. Modified in-place.
+		 * @return void
+		 */
+		private static function maybe_relocate_misplaced_global_key( &$data ) {
+			if ( ! is_array( $data ) ) {
+				return;
+			}
+			$global_block = $data['license']['global'] ?? null;
+			if ( ! is_array( $global_block ) ) {
+				return;
+			}
+			if ( ( $global_block['status'] ?? '' ) !== 'valid' ) {
+				return;
+			}
+			if ( ( $global_block['plan_type'] ?? '' ) !== Plan_Types::SINGLE_ADDON ) {
+				return;
+			}
+
+			$global_key = (string) get_option( self::GLOBAL_KEY_OPTION, '' );
+			if ( '' === $global_key ) {
+				return;
+			}
+
+			$plan_name = (string) ( $global_block['plan_name'] ?? '' );
+			$plugins   = isset( $data['plugins'] ) && is_array( $data['plugins'] ) ? $data['plugins'] : array();
+			$target    = self::find_plugin_for_plan_name( $plan_name, $plugins );
+			if ( empty( $target ) ) {
+				// Couldn't resolve which plugin this key belongs to — leave
+				// the key alone. The render-time warning still surfaces the
+				// problem; the user just has to move it manually.
+				return;
+			}
+
+			$target_slug = (string) $target['slug'];
+			$target_name = (string) $target['name'];
+
+			// Persist the move.
+			$current_keys = get_option( self::PLUGIN_KEYS_OPTION, array() );
+			if ( ! is_array( $current_keys ) ) {
+				$current_keys = array();
+			}
+			// Don't overwrite an existing per-plugin key — if the user already
+			// has the same plugin under Individual Plugin Keys, just clear
+			// Global. The duplicate would be silently deduped by PaddlePress's
+			// idempotent activate() anyway.
+			if ( empty( $current_keys[ $target_slug ] ) ) {
+				$current_keys[ $target_slug ] = $global_key;
+				update_option( self::PLUGIN_KEYS_OPTION, array_filter( $current_keys ) );
+			}
+			delete_option( self::GLOBAL_KEY_OPTION );
+
+			// One-shot notice for the next render.
+			set_transient(
+				self::RELOCATED_NOTICE_TRANSIENT,
+				array(
+					'slug' => $target_slug,
+					'name' => $target_name,
+				),
+				60
+			);
+
+			// Mirror the change in $data so the current render sees the
+			// post-relocation state. The hub didn't grant per_plugin access
+			// during THIS request (the key was sent as the global key), but
+			// the next hub call will, so we mark it optimistically. If that
+			// next call surfaces blocking errors (site limit etc.), the
+			// Api_Error_Handler::interpret_license() flow will catch them
+			// then — no permanent over-promise.
+			$data['license']['global'] = array(
+				'status'           => 'no_key',
+				'plan_type'        => Plan_Types::UNKNOWN,
+				'plan_name'        => '',
+				'expires'          => '',
+				'license_limit'    => 0,
+				'site_count'       => 0,
+				'activations_left' => 0,
+				'errors'           => array(),
+			);
+
+			if ( ! isset( $data['license']['per_plugin'] ) || ! is_array( $data['license']['per_plugin'] ) ) {
+				$data['license']['per_plugin'] = array();
+			}
+			// Hand the license block over to per_plugin so the row shows the
+			// same plan_name / expiry it would after the next fetch.
+			if ( empty( $data['license']['per_plugin'][ $target_slug ] ) ) {
+				$data['license']['per_plugin'][ $target_slug ] = $global_block;
+			}
+
+			// Flip the catalog entry to reflect the (optimistic) per_plugin
+			// access so the catalog tab doesn't render the row as locked
+			// for one page load. Idempotent — only touches the matched slug.
+			foreach ( $data['plugins'] as &$plugin ) {
+				if ( ( $plugin['slug'] ?? '' ) === $target_slug ) {
+					$plugin['has_access']    = true;
+					$plugin['access_source'] = 'per_plugin';
+					break;
+				}
+			}
+			unset( $plugin );
+		}
+
+		/**
+		 * Match a hub plan_name string to a catalog plugin.
+		 *
+		 * The hub formats plan_name like "GravityWP - List Number Format (1
+		 * sites)". We strip the prefix and the site-count suffix, then
+		 * normalize-compare against each plugin's `name` field. Returns the
+		 * first match or [] if no plugin's name matches.
+		 *
+		 * @param string $plan_name Hub-formatted plan name.
+		 * @param array  $plugins   Catalog from the hub response.
+		 * @return array{slug:string, name:string} Empty array if no match.
+		 */
+		private static function find_plugin_for_plan_name( $plan_name, $plugins ) {
+			if ( '' === $plan_name || empty( $plugins ) ) {
+				return array();
+			}
+
+			// "GravityWP - List Number Format (1 sites)" → "List Number Format"
+			$name = preg_replace( '/^GravityWP\s*[-\x{2013}\x{2014}]\s*/u', '', $plan_name );
+			$name = preg_replace( '/\s*\(\s*\d+\s+sites?\s*\)\s*$/i', '', $name );
+			$name = trim( (string) $name );
+			if ( '' === $name ) {
+				return array();
+			}
+
+			$normalize = static function ( $s ) {
+				return preg_replace( '/[^a-z0-9]/i', '', strtolower( (string) $s ) );
+			};
+			$needle = $normalize( $name );
+			if ( '' === $needle ) {
+				return array();
+			}
+
+			foreach ( $plugins as $plugin ) {
+				if ( empty( $plugin['slug'] ) ) {
+					continue;
+				}
+				$candidate = (string) ( $plugin['name'] ?? '' );
+				if ( '' !== $candidate && $normalize( $candidate ) === $needle ) {
+					return array(
+						'slug' => (string) $plugin['slug'],
+						'name' => $candidate,
+					);
+				}
+				// Also try matching against github_name in case plan_name uses
+				// the slug rather than the display name.
+				$gh = (string) ( $plugin['github_name'] ?? '' );
+				if ( '' !== $gh && $normalize( $gh ) === $needle ) {
+					return array(
+						'slug' => (string) $plugin['slug'],
+						'name' => '' !== $candidate ? $candidate : $gh,
+					);
+				}
+			}
+
+			return array();
 		}
 
 		/**
@@ -367,13 +621,123 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
 		}
 
 		/**
-		 * Return stale cache if available, else empty response.
+		 * Return stale cache if available, else empty response — with an
+		 * optional `hub_error` block attached so the UI can render an inline
+		 * notice ("Couldn't reach the license server…" + Retry link).
 		 *
+		 * The hub_error rides on the returned array under a top-level key
+		 * that downstream consumers can ignore safely. Failures are NOT
+		 * cached — we only attach the marker to whatever we return.
+		 *
+		 * @param array $hub_error Optional ['code' => string, 'message' => string].
 		 * @return array
 		 */
-		private static function return_stale_or_empty() {
+		private static function return_stale_or_empty( $hub_error = array() ) {
 			$stale = get_option( self::CACHE_KEY, false );
-			return ( ! empty( $stale['data'] ) ) ? $stale['data'] : self::get_empty_response();
+			$data  = ( ! empty( $stale['data'] ) ) ? $stale['data'] : self::get_empty_response();
+			if ( ! empty( $hub_error ) ) {
+				$data['hub_error'] = $hub_error;
+			}
+			return $data;
+		}
+
+		/**
+		 * Remember each submitted key → plan_type after a successful hub call.
+		 *
+		 * Walks the response and pushes any (key, plan_type) it can resolve
+		 * into the Api_Error_Handler's seen-keys cache, so the Global-field
+		 * validator can later refuse a Single Add-on key.
+		 *
+		 * @param string $global_key          Raw global key.
+		 * @param array  $plugin_license_keys Submitted [slug => key] map.
+		 * @param array  $data                Decoded hub response.
+		 * @return void
+		 */
+		private static function remember_key_plan_types( $global_key, $plugin_license_keys, $data ) {
+			if ( ! class_exists( '\GravityWP\Shared\Api_Error_Handler' ) ) {
+				return;
+			}
+
+			$plugins = isset( $data['plugins'] ) && is_array( $data['plugins'] ) ? $data['plugins'] : array();
+
+			// Global key — only remember when the hub reports it as valid.
+			// For single_addon (which would be misplaced in the Global slot),
+			// also resolve the unlock slug from plan_name so the per-plugin
+			// sanitize callback can reject a future re-save into the wrong row.
+			if ( ! empty( $global_key )
+				&& isset( $data['license']['global']['status'] )
+				&& 'valid' === $data['license']['global']['status']
+				&& ! empty( $data['license']['global']['plan_type'] )
+			) {
+				$plan_type = (string) $data['license']['global']['plan_type'];
+				$unlock_slug = null;
+				if ( Plan_Types::SINGLE_ADDON === $plan_type ) {
+					$target = self::find_plugin_for_plan_name(
+						(string) ( $data['license']['global']['plan_name'] ?? '' ),
+						$plugins
+					);
+					if ( ! empty( $target['slug'] ) ) {
+						$unlock_slug = (string) $target['slug'];
+					}
+				}
+				Api_Error_Handler::remember_key_plan_type( $global_key, $plan_type, $unlock_slug );
+			}
+
+			// Per-plugin keys — remember each valid one. The hub re-keys
+			// per_plugin_data using canonical slug (= github_name), which
+			// may differ from the slug the customer submitted under. So we
+			// match license blocks back to their submitted key by scanning
+			// per_plugin entries for plan_name + plan_type matches.
+			$per_plugin = isset( $data['license']['per_plugin'] ) ? (array) $data['license']['per_plugin'] : array();
+			foreach ( $plugin_license_keys as $submitted_slug => $key ) {
+				if ( empty( $key ) ) {
+					continue;
+				}
+
+				// Try the submitted slug first (canonical key in per_plugin).
+				$info = $per_plugin[ $submitted_slug ] ?? null;
+				if ( ! is_array( $info ) || ( $info['status'] ?? '' ) !== 'valid' ) {
+					$info = null;
+				}
+
+				// Fallback: take the first valid per_plugin block. With
+				// realistic payloads (one or two keys submitted), this is a
+				// safe heuristic — multi-key payloads would deserve a more
+				// careful key↔block match but PaddlePress doesn't expose
+				// the underlying license_id in the response shape.
+				if ( null === $info ) {
+					foreach ( $per_plugin as $candidate ) {
+						if ( is_array( $candidate )
+							&& ( $candidate['status'] ?? '' ) === 'valid'
+							&& ! empty( $candidate['plan_type'] )
+						) {
+							$info = $candidate;
+							break;
+						}
+					}
+				}
+
+				if ( null === $info || empty( $info['plan_type'] ) ) {
+					continue;
+				}
+
+				$plan_type   = (string) $info['plan_type'];
+				$unlock_slug = null;
+				if ( Plan_Types::SINGLE_ADDON === $plan_type ) {
+					// Resolve which plugin THIS key actually unlocks. The
+					// submitted slot may be wrong (e.g. LNF key in AMT slot),
+					// so we trust plan_name over slot position.
+					$target = self::find_plugin_for_plan_name(
+						(string) ( $info['plan_name'] ?? '' ),
+						$plugins
+					);
+					if ( ! empty( $target['slug'] ) ) {
+						$unlock_slug = (string) $target['slug'];
+					}
+				}
+
+				Api_Error_Handler::remember_key_plan_type( $key, $plan_type, $unlock_slug );
+			}
 		}
 
 		/**

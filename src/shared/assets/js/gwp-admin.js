@@ -134,10 +134,21 @@
 		var pattern = /^[a-f0-9-]{20,}$/i;
 
 		inputs.forEach( function ( input ) {
-			// Initial check.
+			// Initial check — honors any server-stamped force-state.
 			updateValidity( input, pattern );
 
+			// Remember the value the server marked as invalid. As long as
+			// the user is still looking at THAT exact value, we stay locked
+			// to invalid. The moment they type anything different, they're
+			// trying to fix it, so we release the lock and let the shape
+			// check take over.
+			var serverInvalidValue = 'invalid' === input.dataset.gwpForceState ? input.value : null;
+
 			input.addEventListener( 'input', function () {
+				if ( null !== serverInvalidValue && input.value !== serverInvalidValue ) {
+					delete input.dataset.gwpForceState;
+					serverInvalidValue = null;
+				}
 				updateValidity( input, pattern );
 			} );
 
@@ -154,6 +165,17 @@
 	 * @param {RegExp}           pattern The validation pattern.
 	 */
 	function updateValidity( input, pattern ) {
+		// Server-side override: when PHP knows this row is invalid (wrong-
+		// plugin key, expired, etc.) it stamps data-gwp-force-state="invalid"
+		// on the input. The shape-only UUID check below would otherwise
+		// re-apply .is-valid on every keystroke, flashing the input green
+		// over a server-validated bad value. Lock it to invalid instead.
+		if ( 'invalid' === input.dataset.gwpForceState ) {
+			input.classList.remove( 'is-valid' );
+			input.classList.add( 'is-invalid' );
+			return;
+		}
+
 		var value = input.value.trim();
 		input.classList.remove( 'is-valid', 'is-invalid' );
 

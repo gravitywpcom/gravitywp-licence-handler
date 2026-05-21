@@ -81,6 +81,15 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Loader' ) ) {
 				require_once $plan_types_file;
 			}
 
+			// 1b. Api_Error_Handler — centralized error catalog. Depends on
+			// Plan_Types; consumed by Hub_Manager, Hub_Ajax, and Registry.
+			// Must load before Hub_Manager so the classifier is available
+			// during the very first hub call.
+			$api_error_file = $base_dir . '/class-api-error-handler.php';
+			if ( file_exists( $api_error_file ) ) {
+				require_once $api_error_file;
+			}
+
 			// 2. Hub_Manager — cache layer used by Registry.
 			$hub_manager_file = $base_dir . '/class-hub-manager.php';
 			if ( file_exists( $hub_manager_file ) ) {

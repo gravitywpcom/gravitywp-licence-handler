@@ -49,7 +49,7 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
 			) );
 
 			if ( ! $plugin || empty( $plugin['has_access'] ) ) {
-				self::fail( 403, __( 'License does not cover this plugin.', 'gravitywp-license-handler' ) );
+				self::fail( 403, Api_Error_Handler::message( 'insufficient_membership_level' ) );
 			}
 
 			$package = '';
@@ -59,7 +59,7 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
 				$package = $plugin['package'];
 			}
 			if ( empty( $package ) ) {
-				self::fail( 400, __( 'Download URL missing from hub response.', 'gravitywp-license-handler' ) );
+				self::fail( 400, Api_Error_Handler::message( 'download_failed' ) );
 			}
 
 			// Self-heal stale catalog URLs. Legacy `.latest-stable.zip` is a 302
@@ -108,12 +108,12 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
 			}
 
 			if ( 'direct' !== get_filesystem_method() ) {
-				self::fail( 412, __( 'Filesystem requires FTP credentials. Please install via Plugins → Add New instead.', 'gravitywp-license-handler' ) );
+				self::fail( 412, Api_Error_Handler::message( 'filesystem_requires_ftp' ) );
 			}
 
 			$lock_key = 'gwp_hub_lock_' . md5( $slug );
 			if ( get_transient( $lock_key ) ) {
-				self::fail( 429, __( 'Operation already in progress.', 'gravitywp-license-handler' ) );
+				self::fail( 429, Api_Error_Handler::message( 'operation_in_progress' ) );
 			}
 			set_transient( $lock_key, 1, 60 );
 
@@ -161,7 +161,7 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
 				self::fail( 500, self::format_wp_error( $result ) );
 			}
 			if ( false === $result || null === $result ) {
-				self::fail( 500, __( 'Install failed. Please try again.', 'gravitywp-license-handler' ) );
+				self::fail( 500, Api_Error_Handler::message( 'download_failed' ) );
 			}
 
 			wp_clean_plugins_cache();
@@ -192,7 +192,7 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
 			) );
 
 			if ( ! $plugin || empty( $plugin['has_access'] ) ) {
-				self::fail( 403, __( 'License does not cover this plugin.', 'gravitywp-license-handler' ) );
+				self::fail( 403, Api_Error_Handler::message( 'insufficient_membership_level' ) );
 			}
 
 			$package = '';
@@ -202,7 +202,7 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
 				$package = $plugin['package'];
 			}
 			if ( empty( $package ) ) {
-				self::fail( 400, __( 'Download URL missing from hub response.', 'gravitywp-license-handler' ) );
+				self::fail( 400, Api_Error_Handler::message( 'download_failed' ) );
 			}
 
 			// Self-heal stale catalog URLs (same as install).
@@ -246,7 +246,7 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
 			self::load_upgrader_includes();
 
 			if ( 'direct' !== get_filesystem_method() ) {
-				self::fail( 412, __( 'Filesystem requires FTP credentials. Please update via Plugins → Installed Plugins instead.', 'gravitywp-license-handler' ) );
+				self::fail( 412, Api_Error_Handler::message( 'filesystem_requires_ftp' ) );
 			}
 
 			$lock_key = 'gwp_hub_lock_' . md5( $slug );
@@ -294,7 +294,7 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
 				self::fail( 500, self::format_wp_error( $result ) );
 			}
 			if ( false === $result || null === $result ) {
-				self::fail( 500, __( 'Update failed. Please try again.', 'gravitywp-license-handler' ) );
+				self::fail( 500, Api_Error_Handler::message( 'download_failed' ) );
 			}
 
 			wp_clean_plugins_cache();
@@ -355,7 +355,7 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
 
 			self::load_upgrader_includes();
 			if ( 'direct' !== get_filesystem_method() ) {
-				self::fail( 412, __( 'Filesystem requires FTP credentials. Please delete via Plugins → Installed Plugins instead.', 'gravitywp-license-handler' ) );
+				self::fail( 412, Api_Error_Handler::message( 'filesystem_requires_ftp' ) );
 			}
 
 			$result = delete_plugins( array( $plugin_file ) );
@@ -374,14 +374,14 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
 
 		private static function verify_request( $cap ) {
 			if ( ! check_ajax_referer( self::NONCE_ACTION, 'nonce', false ) ) {
-				self::fail( 403, __( 'Security check failed.', 'gravitywp-license-handler' ) );
+				self::fail( 403, Api_Error_Handler::message( 'security_check_failed' ) );
 			}
 			if ( ! current_user_can( $cap ) ) {
 				self::fail( 403, __( 'Insufficient permission.', 'gravitywp-license-handler' ) );
 			}
 			$slug = isset( $_POST['slug'] ) ? sanitize_key( wp_unslash( $_POST['slug'] ) ) : '';
 			if ( '' === $slug ) {
-				self::fail( 400, __( 'Missing plugin slug.', 'gravitywp-license-handler' ) );
+				self::fail( 400, Api_Error_Handler::message( 'rest_missing_callback_param', array( 'slug' ) ) );
 			}
 			return $slug;
 		}

@@ -148,7 +148,7 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 				'gravitywp_global_license_key',
 				array(
 					'type'              => 'string',
-					'sanitize_callback' => 'sanitize_text_field',
+					'sanitize_callback' => array( self::class, 'sanitize_global_key' ),
 					'default'           => '',
 				)
 			);
@@ -165,6 +165,51 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 		}
 
 		/**
+		 * Sanitize the Global License Key setting.
+		 *
+		 * Rejects keys we've previously seen the hub identify as
+		 * `single_addon` plans — those belong in the Individual Plugin Keys
+		 * table, not the Global field. An unknown key (never submitted
+		 * before) is allowed through; the hub's next response will tell us
+		 * its plan_type, and the *next* save attempt will be validated.
+		 *
+		 * @param mixed $raw Raw input from the form.
+		 * @return string Sanitized key, or '' if rejected.
+		 */
+		public static function sanitize_global_key( $raw ) {
+			$key = sanitize_text_field( trim( (string) $raw ) );
+			if ( '' === $key ) {
+				return '';
+			}
+
+			// Honor existing behavior for the no-op case (user saves the
+			// settings without changing the key value): re-detection isn't
+			// useful, just return as-is. Same key as already stored = no
+			// validation needed.
+			$existing = (string) get_option( 'gravitywp_global_license_key', '' );
+			if ( $existing === $key ) {
+				return $key;
+			}
+
+			if ( class_exists( '\GravityWP\Shared\Api_Error_Handler' ) ) {
+				$detected = Api_Error_Handler::detect_key_plan_type( $key );
+				if ( Plan_Types::SINGLE_ADDON === $detected ) {
+					add_settings_error(
+						'gravitywp_global_license_key',
+						'gwp_wrong_field_for_plan_type',
+						Api_Error_Handler::message( 'wrong_field_for_plan_type' ),
+						'error'
+					);
+					// Keep the previously-saved value so the user doesn't
+					// lose a working Global key while we reject the paste.
+					return $existing;
+				}
+			}
+
+			return $key;
+		}
+
+		/**
 		 * Sanitize the plugin license keys option.
 		 *
 		 * @param mixed $raw Raw input.
@@ -175,14 +220,96 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 				return array();
 			}
 
+			// Read the previously-saved map once. We use it both to detect
+			// no-op saves (same key in same slot, skip validation) and to
+			// keep a working value when we reject a paste.
+			$existing = get_option( 'gravitywp_plugin_license_keys', array() );
+			if ( ! is_array( $existing ) ) {
+				$existing = array();
+			}
+
+			$has_detector = class_exists( '\GravityWP\Shared\Api_Error_Handler' );
+
 			$clean = array();
 			foreach ( $raw as $slug => $key ) {
 				$slug_clean = sanitize_key( $slug );
 				$key_clean  = sanitize_text_field( trim( (string) $key ) );
-				if ( ! empty( $slug_clean ) && ! empty( $key_clean ) ) {
-					$clean[ $slug_clean ] = $key_clean;
+
+				if ( empty( $slug_clean ) ) {
+					continue;
 				}
+
+				// Empty submission for this slot: persist as cleared (the
+				// final array_filter at the bottom of this method drops it).
+				if ( empty( $key_clean ) ) {
+					continue;
+				}
+
+				// No-op: same key as already saved → accept without
+				// re-validating. Matches the behavior of sanitize_global_key.
+				$prior = isset( $existing[ $slug_clean ] ) ? (string) $existing[ $slug_clean ] : '';
+				if ( $prior === $key_clean ) {
+					$clean[ $slug_clean ] = $key_clean;
+					continue;
+				}
+
+				// Detection: look up what we know about this key from
+				// previous hub responses. Unknown keys (never submitted
+				// before) get passed through — the next hub call will
+				// classify them and Hub_Manager's relocator / interpret_license
+				// will surface any issue post-hoc.
+				if ( $has_detector ) {
+					$dest = Api_Error_Handler::detect_key_destination( $key_clean );
+
+					// Reject case A: this key is a Single Add-on that we've
+					// previously seen unlock a DIFFERENT plugin. Keep the
+					// prior value for this slot so a working key isn't lost.
+					if ( Plan_Types::SINGLE_ADDON === $dest['plan_type']
+						&& null !== $dest['slug']
+						&& $dest['slug'] !== $slug_clean
+					) {
+						add_settings_error(
+							'gravitywp_plugin_license_keys',
+							'gwp_wrong_plugin_key_' . $slug_clean,
+							Api_Error_Handler::message( 'wrong_plugin_key' ),
+							'error'
+						);
+						if ( '' !== $prior ) {
+							$clean[ $slug_clean ] = $prior;
+						}
+						continue;
+					}
+
+					// Multi-plugin licenses (All Access / Agency / List Add-ons)
+					// pasted into a per-plugin row USED to be rejected here,
+					// but they actually work — PaddlePress grants download
+					// permission for every plugin under these plans, so one
+					// such key in any per_plugin slot unlocks everything.
+					// We allow the save and show a non-blocking 'info' notice
+					// + an inline note under the row (rendered by
+					// Api_Error_Handler::interpret_license returning
+					// STATUS_ACTIVE with primary_code='global_key_in_per_plugin').
+					// The notice nudges the user toward the cleaner Global
+					// placement without taking away a working configuration.
+					if ( in_array(
+						$dest['plan_type'],
+						array( Plan_Types::ALL_ACCESS, Plan_Types::AGENCY, Plan_Types::LIST_ADDONS ),
+						true
+					) ) {
+						add_settings_error(
+							'gravitywp_plugin_license_keys',
+							'gwp_global_key_in_per_plugin_' . $slug_clean,
+							Api_Error_Handler::message( 'global_key_in_per_plugin' ),
+							'info' // 'info' (not 'error') — save proceeds.
+						);
+						$clean[ $slug_clean ] = $key_clean;
+						continue;
+					}
+				}
+
+				$clean[ $slug_clean ] = $key_clean;
 			}
+
 			return $clean;
 		}
 
@@ -325,6 +452,17 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 		public static function render_page() {
 			wp_enqueue_style( 'dashicons' );
 
+			// Display any settings errors raised by our sanitize callbacks
+			// (sanitize_global_key rejects Single Add-on keys in the Global
+			// field; sanitize_plugin_keys may add others in future). WP only
+			// auto-displays settings_errors() on a small set of core admin
+			// pages — our custom `gravitywp` page isn't one of them, so the
+			// add_settings_error() output is silently dropped unless we call
+			// it explicitly here. Without this, a user pasting a bad Global
+			// key sees no feedback at all.
+			settings_errors( 'gravitywp_global_license_key' );
+			settings_errors( 'gravitywp_plugin_license_keys' );
+
 			// Allow refresh via URL parameter.
 			$force_refresh = isset( $_GET['refresh'] ) && '1' === $_GET['refresh']; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 			$hub_data      = Hub_Manager::get_hub_data( $force_refresh );
@@ -359,9 +497,83 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 			$installed_plugins = get_plugins();
 
 			$has_any_license = Hub_Manager::has_any_valid_license();
+
+			// Count rows that are TRULY unlocked via a per-plugin key — the
+			// catalog's has_access + access_source is the source of truth
+			// (cf. Api_Error_Handler::interpret_license). The hero's badge
+			// used to count `per_plugin_info[*].status === 'valid'` which
+			// over-counted wrong-plugin keys and keys with blocking errors.
+			$valid_per_count = 0;
+			foreach ( $all_plugins as $_p ) {
+				if ( ! empty( $_p['has_access'] ) && 'per_plugin' === ( $_p['access_source'] ?? '' ) ) {
+					++$valid_per_count;
+				}
+			}
+
+			// Hub failures (Cloudflare, network timeout, HTTP 5xx, malformed
+			// JSON) attach a `hub_error` block to the data returned by
+			// Hub_Manager. Surface it as an inline banner at the top of the
+			// page — previously these failures silently rendered an empty
+			// catalog with no explanation.
+			$hub_error = isset( $hub_data['hub_error'] ) && is_array( $hub_data['hub_error'] )
+				? $hub_data['hub_error']
+				: null;
+
+			// One-shot relocation notice: Hub_Manager auto-moved a Single
+			// Add-on key out of the Global field into the matching per-plugin
+			// row. We surface a green success notice exactly once, then the
+			// transient is consumed and the notice disappears on the next
+			// load. The relocation itself already mutated $hub_data in-place,
+			// so the page below renders the post-relocation state.
+			$relocated = get_transient( Hub_Manager::RELOCATED_NOTICE_TRANSIENT );
+			if ( $relocated ) {
+				delete_transient( Hub_Manager::RELOCATED_NOTICE_TRANSIENT );
+			}
 			?>
 			<div class="wrap gwp-admin">
-				<?php self::render_hero( $global_info, $per_plugin_info, $global_key, $has_any_license, count( $unlocked ), count( $all_plugins ) ); ?>
+				<?php if ( is_array( $relocated ) && ! empty( $relocated['name'] ) ) : ?>
+					<div class="gwp-alert gwp-alert--success" role="status" style="margin-bottom:16px;">
+						<span class="dashicons dashicons-yes-alt"></span>
+						<div class="gwp-alert__content">
+							<p class="gwp-alert__title"><?php esc_html_e( 'Single Add-on key moved automatically', 'gravitywp-license-handler' ); ?></p>
+							<p class="gwp-alert__text">
+								<?php
+								printf(
+									/* translators: %s: plugin display name */
+									esc_html__( 'You entered a Single Add-on key in the Global License Key field. We detected it belongs to %s and moved it to the matching row under Individual Plugin Keys.', 'gravitywp-license-handler' ),
+									'<strong>' . esc_html( $relocated['name'] ) . '</strong>'
+								);
+								?>
+							</p>
+						</div>
+					</div>
+				<?php endif; ?>
+
+				<?php if ( $hub_error ) : ?>
+					<div class="gwp-alert gwp-alert--danger" role="alert" style="margin-bottom:16px;">
+						<span class="dashicons dashicons-warning"></span>
+						<div class="gwp-alert__content">
+							<p class="gwp-alert__title"><?php esc_html_e( 'License server unreachable', 'gravitywp-license-handler' ); ?></p>
+							<p class="gwp-alert__text">
+								<?php echo esc_html( $hub_error['message'] ?? '' ); ?>
+								<?php
+								$retry_url = add_query_arg(
+									array(
+										'page'    => self::PAGE_SLUG,
+										'refresh' => '1',
+									),
+									admin_url( 'admin.php' )
+								);
+								?>
+								<a href="<?php echo esc_url( $retry_url ); ?>" class="button button-secondary" style="margin-left:8px;">
+									<?php esc_html_e( 'Retry', 'gravitywp-license-handler' ); ?>
+								</a>
+							</p>
+						</div>
+					</div>
+				<?php endif; ?>
+
+				<?php self::render_hero( $global_info, $per_plugin_info, $global_key, $has_any_license, count( $unlocked ), count( $all_plugins ), $valid_per_count ); ?>
 
 				<nav class="gwp-tabs" role="tablist">
 					<a href="#plugins" class="gwp-tab is-active" data-gwp-tab="plugins" role="tab">
@@ -423,9 +635,12 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 		 * @param bool   $has_any_license Whether any license is valid.
 		 * @param int    $unlocked_count  Number of unlocked plugins.
 		 * @param int    $total_count     Total plugins.
+		 * @param int    $valid_per_count Number of plugins truly unlocked via
+		 *                                a per-plugin key (catalog-derived,
+		 *                                not raw `status === valid`).
 		 * @return void
 		 */
-		private static function render_hero( $global_info, $per_plugin_info, $global_key, $has_any_license, $unlocked_count, $total_count ) {
+		private static function render_hero( $global_info, $per_plugin_info, $global_key, $has_any_license, $unlocked_count, $total_count, $valid_per_count = 0 ) {
 			$has_per_plugin = ! empty( $per_plugin_info );
 			$plan_badge     = null;
 			$plan_label     = '';
@@ -433,16 +648,36 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 			$site_count     = 0;
 			$site_limit     = 0;
 
+			// Detect "single-addon key in the Global slot" up front so the hero
+			// doesn't shout "Your plugins are unlocked and ready to use." for
+			// a key that actually unlocks zero plugins via the global path.
+			$global_plan_type      = $global_info['plan_type'] ?? Plan_Types::UNKNOWN;
+			$global_status         = $global_info['status'] ?? '';
+			$wrong_field_for_global = (
+				'valid' === $global_status
+				&& Plan_Types::SINGLE_ADDON === $global_plan_type
+				&& ! empty( $global_key )
+			);
+
 			if ( empty( $global_key ) && ! $has_per_plugin ) {
 				$state    = 'empty';
 				$title    = __( 'Welcome to GravityWP', 'gravitywp-license-handler' );
 				$subtitle = __( 'Enter a license key to unlock and manage your plugins.', 'gravitywp-license-handler' );
+			} elseif ( $wrong_field_for_global && 0 === (int) $valid_per_count ) {
+				// Saved Global key is a Single Add-on AND no per-plugin keys
+				// are working either → the site has no functional license.
+				// Render as a warning, not as success.
+				$state      = 'invalid';
+				$plan_badge = Plan_Types::SINGLE_ADDON;
+				$plan_label = Plan_Types::get_label( $plan_badge );
+				$title      = __( 'Wrong field for this license type', 'gravitywp-license-handler' );
+				$subtitle   = __( 'Your Single Add-on key belongs under Individual Plugin Keys, not the Global License Key field.', 'gravitywp-license-handler' );
 			} elseif ( $has_any_license ) {
 				$state         = 'active';
-				$global_valid  = ( ( $global_info['status'] ?? '' ) === 'valid' );
+				$global_valid  = ( 'valid' === $global_status );
 
-				if ( $global_valid ) {
-					$plan_badge = $global_info['plan_type'] ?? Plan_Types::UNKNOWN;
+				if ( $global_valid && ! $wrong_field_for_global ) {
+					$plan_badge = $global_plan_type;
 					$plan_label = Plan_Types::get_label( $plan_badge );
 					$title      = $global_info['plan_name'] ?? __( 'License Active', 'gravitywp-license-handler' );
 					$expires    = $global_info['expires'] ?? '';
@@ -450,20 +685,35 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 					$site_limit = (int) ( $global_info['license_limit'] ?? 0 );
 					$subtitle   = __( 'Your plugins are unlocked and ready to use.', 'gravitywp-license-handler' );
 				} else {
-					$valid_per = 0;
-					foreach ( $per_plugin_info as $info ) {
-						if ( ( $info['status'] ?? '' ) === 'valid' ) {
-							++$valid_per;
-						}
-					}
+					// Use catalog-derived count (passed in) instead of iterating
+					// per_plugin_info — the latter would over-count wrong-plugin
+					// keys and keys with blocking errors that don't actually
+					// unlock anything on this site.
+					$valid_per  = (int) $valid_per_count;
 					$plan_badge = Plan_Types::SINGLE_ADDON;
 					$plan_label = Plan_Types::get_label( $plan_badge );
-					$title      = sprintf(
-						/* translators: %d: count */
-						_n( '%d Individual License Active', '%d Individual Licenses Active', $valid_per, 'gravitywp-license-handler' ),
-						$valid_per
-					);
-					$subtitle = __( 'Single Add-on licenses applied.', 'gravitywp-license-handler' );
+
+					if ( 0 === $valid_per ) {
+						// has_any_license is true (PaddlePress says at least
+						// one per_plugin status='valid') but $valid_per_count
+						// is 0, which means every entered key has a blocking
+						// embedded error — site limit reached, wrong product,
+						// expired-on-server, etc. Reading "0 Individual
+						// Licenses Active" as a headline is confusing when
+						// the user has clearly entered a key. Flip the hero
+						// to the invalid state and point them at the
+						// per-row alerts for the specific reason.
+						$state    = 'invalid';
+						$title    = __( 'License entered but not active', 'gravitywp-license-handler' );
+						$subtitle = __( 'Check the rows below for the specific reason.', 'gravitywp-license-handler' );
+					} else {
+						$title    = sprintf(
+							/* translators: %d: count */
+							_n( '%d Individual License Active', '%d Individual Licenses Active', $valid_per, 'gravitywp-license-handler' ),
+							$valid_per
+						);
+						$subtitle = __( 'Single Add-on licenses applied.', 'gravitywp-license-handler' );
+					}
 				}
 			} else {
 				$state    = 'invalid';
@@ -649,6 +899,35 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 					++$unlocked_global;
 				}
 			}
+
+			// Reject case: the saved Global key is a Single Add-on key. The
+			// hub reports `status: valid, plan_type: single_addon`, which
+			// previously rendered as a green "Active … Unlocks 0 plugins"
+			// banner — a self-contradicting message. Now we surface it as a
+			// warning and tell the user where the key actually belongs.
+			//
+			// Why this lives at render-time as well as in sanitize_global_key:
+			// the sanitize validator can only refuse a save when we've
+			// previously seen the key (via per-plugin submission) and know
+			// its plan_type. A FRESH paste straight into Global bypasses the
+			// validator, lands in the option store, the hub identifies it
+			// as single_addon on the next fetch, and we discover the mistake
+			// only here. Surfacing it instead of silently labeling it Active
+			// is the professional behavior.
+			$wrong_field_for_global = ( 'valid' === $status )
+				&& ( Plan_Types::SINGLE_ADDON === $plan_type )
+				&& ! empty( $global_key );
+
+			// "Bad" Global input states — a key was entered but the hub
+			// doesn't accept it. Without this flag the JS shape validator
+			// happily paints the input green (UUID-shape match) over a
+			// server-known-invalid value. Same defense-in-depth pattern as
+			// the per-plugin rows: add the is-invalid class AND a
+			// data-gwp-force-state="invalid" attribute so the JS validator
+			// won't overwrite it on focus/blur.
+			$global_is_bad = ! empty( $global_key )
+				&& 'valid' !== $status
+				&& ! $wrong_field_for_global;
 			?>
 			<div class="gwp-card">
 				<div class="gwp-card__header">
@@ -677,9 +956,10 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 							id="gravitywp_global_license_key"
 							name="gravitywp_global_license_key"
 							value="<?php echo esc_attr( $global_key ); ?>"
-							class="gwp-input"
+							class="gwp-input <?php echo $global_is_bad ? 'is-invalid' : ''; ?>"
 							placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 							data-gwp-validate="license-key"
+							<?php if ( $global_is_bad ) : ?>data-gwp-force-state="invalid"<?php endif; ?>
 							autocomplete="off"
 						/>
 						<p class="description">
@@ -687,7 +967,35 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 						</p>
 					</div>
 
-					<?php if ( 'valid' === $status ) : ?>
+					<?php if ( $wrong_field_for_global ) : ?>
+						<div class="gwp-alert gwp-alert--warn">
+							<span class="dashicons dashicons-warning"></span>
+							<div class="gwp-alert__content">
+								<p class="gwp-alert__title">
+									<?php esc_html_e( 'Wrong field for this license type', 'gravitywp-license-handler' ); ?>
+								</p>
+								<p class="gwp-alert__text">
+									<?php
+									printf(
+										/* translators: %s: plan name returned by the hub */
+										esc_html__( 'The key you entered is a Single Add-on license (%s) and unlocks exactly one plugin. The Global License Key field is for All Access, List Add-ons, and Agency plans. Move this key to the matching row under Individual Plugin Keys below, then clear it from this field.', 'gravitywp-license-handler' ),
+										esc_html( $plan_name )
+									);
+									?>
+								</p>
+							</div>
+						</div>
+					<?php elseif ( empty( $global_key ) ) : ?>
+						<div class="gwp-alert gwp-alert--info">
+							<span class="dashicons dashicons-info"></span>
+							<div class="gwp-alert__content">
+								<p class="gwp-alert__title"><?php esc_html_e( 'No global license key configured', 'gravitywp-license-handler' ); ?></p>
+								<p class="gwp-alert__text">
+									<?php esc_html_e( 'Enter your key above and save. If you have a Single Add-on license, use the Individual Plugin Keys section below.', 'gravitywp-license-handler' ); ?>
+								</p>
+							</div>
+						</div>
+					<?php elseif ( 'valid' === $status ) : ?>
 						<div class="gwp-alert gwp-alert--success">
 							<span class="dashicons dashicons-yes-alt"></span>
 							<div class="gwp-alert__content">
@@ -714,32 +1022,84 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 								</p>
 							</div>
 						</div>
-					<?php elseif ( 'no_key' === $status || empty( $global_key ) ) : ?>
-						<div class="gwp-alert gwp-alert--info">
-							<span class="dashicons dashicons-info"></span>
-							<div class="gwp-alert__content">
-								<p class="gwp-alert__title"><?php esc_html_e( 'No global license key configured', 'gravitywp-license-handler' ); ?></p>
-								<p class="gwp-alert__text">
-									<?php esc_html_e( 'Enter your key above and save. If you have a Single Add-on license, use the Individual Plugin Keys section below.', 'gravitywp-license-handler' ); ?>
-								</p>
-							</div>
-						</div>
 					<?php else : ?>
-						<div class="gwp-alert gwp-alert--danger">
+						<div class="gwp-alert gwp-alert--danger" role="alert">
 							<span class="dashicons dashicons-warning"></span>
 							<div class="gwp-alert__content">
-								<p class="gwp-alert__title"><?php esc_html_e( 'License invalid or expired', 'gravitywp-license-handler' ); ?></p>
+								<p class="gwp-alert__title">
+									<?php
+									// Title text varies with the underlying cause so the
+									// banner is actionable at a glance, not just a generic
+									// "License invalid or expired" line over every failure.
+									// We reach this branch only with a non-empty $global_key
+									// (the elseif chain above handles the empty case), so the
+									// title never says "No license key provided" here.
+									$errors     = isset( $global_info['errors'] ) && is_array( $global_info['errors'] ) ? $global_info['errors'] : array();
+									$first_code = '';
+									foreach ( $errors as $code => $_messages ) {
+										$first_code = (string) $code;
+										break;
+									}
+									switch ( $first_code ) {
+										case 'missing_license_key':
+											esc_html_e( 'License key not found', 'gravitywp-license-handler' );
+											break;
+										case 'expired_license_key':
+											esc_html_e( 'License expired', 'gravitywp-license-handler' );
+											break;
+										case 'blocked_license_domain':
+											esc_html_e( 'This site is blocked', 'gravitywp-license-handler' );
+											break;
+										case 'invalid_product':
+											esc_html_e( "License doesn't match this product", 'gravitywp-license-handler' );
+											break;
+										case 'invalid_license_or_domain':
+											esc_html_e( 'License key not recognized', 'gravitywp-license-handler' );
+											break;
+										case 'can_not_add_new_domain':
+											esc_html_e( 'Site limit reached', 'gravitywp-license-handler' );
+											break;
+										case 'insufficient_membership_level':
+											esc_html_e( "License doesn't cover this account", 'gravitywp-license-handler' );
+											break;
+										case 'unregistered_license_domain':
+											esc_html_e( 'License not yet activated for this site', 'gravitywp-license-handler' );
+											break;
+										default:
+											esc_html_e( 'License invalid or expired', 'gravitywp-license-handler' );
+									}
+									?>
+								</p>
 								<p class="gwp-alert__text">
 									<?php
-									$errors = $global_info['errors'] ?? array();
-									if ( ! empty( $errors ) && is_array( $errors ) ) {
-										foreach ( $errors as $messages ) {
+									// Surface every error from the hub. For each code, prefer
+									// the Api_Error_Handler catalog message (translated, copy
+									// reviewed) over PaddlePress's raw string (English,
+									// developer-facing). Falls back to the raw string if the
+									// code isn't in the catalog — better to show something
+									// English than nothing.
+									if ( ! empty( $errors ) ) {
+										$catalog = Api_Error_Handler::get_catalog();
+										$shown   = array();
+										foreach ( $errors as $code => $messages ) {
+											$code_str = (string) $code;
+											if ( isset( $shown[ $code_str ] ) ) {
+												continue;
+											}
+											$shown[ $code_str ] = true;
+											if ( isset( $catalog[ $code_str ] ) ) {
+												echo esc_html( Api_Error_Handler::message( $code_str ) ) . '<br />';
+												continue;
+											}
 											foreach ( (array) $messages as $msg ) {
-												echo esc_html( $msg ) . '<br />';
+												echo esc_html( (string) $msg ) . '<br />';
 											}
 										}
 									} else {
-										esc_html_e( 'Please check your key or contact support.', 'gravitywp-license-handler' );
+										// Empty errors + invalid status is what PaddlePress
+										// returns for non-existent keys (the key isn't even
+										// in the payments table). Be specific.
+										esc_html_e( "We couldn't find this license key. Double-check that you copied it correctly from your purchase email, or contact support.", 'gravitywp-license-handler' );
 									}
 									?>
 								</p>
@@ -800,26 +1160,144 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 									$license_data = $per_plugin_info[ $slug ] ?? null;
 									$has_access   = ! empty( $plugin['has_access'] );
 									$access_src   = $plugin['access_source'] ?? 'none';
-									$status_class = 'is-empty';
-									$status_text  = __( 'Not set', 'gravitywp-license-handler' );
-									$status_icon  = 'dashicons-minus';
 
-									if ( ! empty( $current_key ) ) {
-										// Has an individual key set — check if it's valid.
-										if ( $license_data && ( $license_data['status'] ?? '' ) === 'valid' ) {
+									// Delegate to the centralized interpreter. It cross-references the
+									// hub's raw `status` with the row's `has_access` + `access_source`
+									// and the embedded error map, producing one of:
+									//   ACTIVE | INACTIVE | INVALID | WRONG_PLUGIN | VIA_GLOBAL | EMPTY.
+									// This collapses what used to be three special-case branches and a
+									// silent "Active" lie when the key was for a different plugin.
+									$interp = Api_Error_Handler::interpret_license(
+										is_array( $license_data ) ? $license_data : array(),
+										array(
+											'has_access'    => $has_access,
+											'access_source' => $access_src,
+											'has_key'       => ! empty( $current_key ),
+										)
+									);
+
+									switch ( $interp['effective_status'] ) {
+										case Api_Error_Handler::STATUS_ACTIVE:
 											$status_class = 'is-valid';
 											$status_text  = __( 'Active', 'gravitywp-license-handler' );
 											$status_icon  = 'dashicons-yes-alt';
-										} else {
+											break;
+										case Api_Error_Handler::STATUS_VIA_GLOBAL:
+											$status_class = 'is-valid';
+											$status_text  = __( 'Via Global', 'gravitywp-license-handler' );
+											$status_icon  = 'dashicons-admin-network';
+											break;
+										case Api_Error_Handler::STATUS_INACTIVE:
+											// Valid key but can't be used here — pick a SHORT badge
+											// label per primary_code, since the Status column is
+											// width-constrained (120px). The full catalog message
+											// rides along in the inline alert row below.
 											$status_class = 'is-invalid';
-											$status_text  = __( 'Invalid', 'gravitywp-license-handler' );
 											$status_icon  = 'dashicons-warning';
-										}
-									} elseif ( $has_access && 'global' === $access_src ) {
-										// No individual key, but covered by the Global License Key.
-										$status_class = 'is-valid';
-										$status_text  = __( 'Via Global', 'gravitywp-license-handler' );
-										$status_icon  = 'dashicons-admin-network';
+											switch ( $interp['primary_code'] ) {
+												case 'can_not_add_new_domain':
+													$status_text = __( 'Site limit', 'gravitywp-license-handler' );
+													break;
+												case 'insufficient_membership_level':
+													$status_text = __( 'Wrong plan', 'gravitywp-license-handler' );
+													break;
+												case 'invalid_license_or_domain':
+													$status_text = __( 'Not active', 'gravitywp-license-handler' );
+													break;
+												case 'unregistered_license_domain':
+													$status_text = __( 'Activating…', 'gravitywp-license-handler' );
+													break;
+												default:
+													$status_text = __( 'Not active', 'gravitywp-license-handler' );
+											}
+											break;
+										case Api_Error_Handler::STATUS_WRONG_PLUGIN:
+											$status_class = 'is-invalid';
+											$status_text  = __( 'Wrong plugin', 'gravitywp-license-handler' );
+											$status_icon  = 'dashicons-warning';
+											break;
+										case Api_Error_Handler::STATUS_INVALID:
+											$status_class = 'is-invalid';
+											$status_icon  = 'dashicons-warning';
+											switch ( $interp['primary_code'] ) {
+												case 'missing_license_key':
+													$status_text = __( 'Not found', 'gravitywp-license-handler' );
+													break;
+												case 'expired_license_key':
+													$status_text = __( 'Expired', 'gravitywp-license-handler' );
+													break;
+												case 'blocked_license_domain':
+													$status_text = __( 'Blocked', 'gravitywp-license-handler' );
+													break;
+												case 'invalid_product':
+													$status_text = __( 'Wrong product', 'gravitywp-license-handler' );
+													break;
+												case 'invalid_license_or_domain':
+													$status_text = __( 'Not recognized', 'gravitywp-license-handler' );
+													break;
+												case 'global_key_in_per_plugin':
+													$status_text = __( 'Wrong field', 'gravitywp-license-handler' );
+													break;
+												case 'no_key':
+													$status_text = __( 'Not set', 'gravitywp-license-handler' );
+													break;
+												default:
+													$status_text = __( 'Invalid', 'gravitywp-license-handler' );
+											}
+											break;
+										case Api_Error_Handler::STATUS_EMPTY:
+										default:
+											$status_class = 'is-empty';
+											$status_text  = __( 'Not set', 'gravitywp-license-handler' );
+											$status_icon  = 'dashicons-minus';
+											break;
+									}
+
+									// Tooltip carries the precise catalog message so users see the
+									// specific reason on hover (e.g. "Your license is at its site
+									// limit" vs. the generic "Invalid" badge text).
+									$status_tooltip = $interp['message'];
+
+									// "Bad row" states: red input border + an inline alert below
+									// the row showing the full catalog message. Active/Via Global/
+									// Empty rows skip both.
+									$bad_states = array(
+										Api_Error_Handler::STATUS_WRONG_PLUGIN,
+										Api_Error_Handler::STATUS_INVALID,
+										Api_Error_Handler::STATUS_INACTIVE,
+									);
+									$is_bad_row = in_array( $interp['effective_status'], $bad_states, true );
+
+									// Informational note state: the row IS working (status=active
+									// or via_global, no red border) but the interpreter has
+									// something useful to say — e.g. "This is a multi-plugin
+									// license, you can move it to Global for clarity." Detected
+									// by primary_code being something other than the literal
+									// 'active' / 'via_global' codes that carry no extra info.
+									$has_inline_note = ! $is_bad_row && ! in_array(
+										$interp['primary_code'],
+										array( 'active', 'via_global', 'no_key' ),
+										true
+									);
+									$show_alert_row = $is_bad_row || $has_inline_note;
+
+									// Map Api_Error_Handler::severity → CSS modifier so the alert
+									// matches its meaning (red for errors, yellow for warnings,
+									// blue for info).
+									switch ( $interp['severity'] ) {
+										case Api_Error_Handler::SEVERITY_ERROR:
+											$alert_modifier = 'gwp-alert--danger';
+											$alert_icon     = 'dashicons-warning';
+											break;
+										case Api_Error_Handler::SEVERITY_WARN:
+											$alert_modifier = 'gwp-alert--warn';
+											$alert_icon     = 'dashicons-warning';
+											break;
+										case Api_Error_Handler::SEVERITY_INFO:
+										default:
+											$alert_modifier = 'gwp-alert--info';
+											$alert_icon     = 'dashicons-info';
+											break;
 									}
 
 									$icon = '';
@@ -847,19 +1325,32 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 												type="text"
 												name="gravitywp_plugin_license_keys[<?php echo esc_attr( $slug ); ?>]"
 												value="<?php echo esc_attr( $current_key ); ?>"
-												class="gwp-input"
+												class="gwp-input <?php echo $is_bad_row ? 'is-invalid' : ''; ?>"
 												placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 												data-gwp-validate="license-key"
+												<?php if ( $is_bad_row ) : ?>data-gwp-force-state="invalid"<?php endif; ?>
 												autocomplete="off"
 											/>
 										</td>
 										<td>
-											<span class="gwp-keys-table__status <?php echo esc_attr( $status_class ); ?>">
+											<span class="gwp-keys-table__status <?php echo esc_attr( $status_class ); ?>" title="<?php echo esc_attr( $status_tooltip ); ?>">
 												<span class="dashicons <?php echo esc_attr( $status_icon ); ?>"></span>
 												<?php echo esc_html( $status_text ); ?>
 											</span>
 										</td>
 									</tr>
+									<?php if ( $show_alert_row ) : ?>
+										<tr class="gwp-keys-table__error-row">
+											<td colspan="3">
+												<div class="gwp-alert <?php echo esc_attr( $alert_modifier ); ?>" role="<?php echo $is_bad_row ? 'alert' : 'status'; ?>">
+													<span class="dashicons <?php echo esc_attr( $alert_icon ); ?>"></span>
+													<div class="gwp-alert__content">
+														<p class="gwp-alert__text"><?php echo esc_html( $interp['message'] ); ?></p>
+													</div>
+												</div>
+											</td>
+										</tr>
+									<?php endif; ?>
 								<?php endforeach; ?>
 							</tbody>
 						</table>
