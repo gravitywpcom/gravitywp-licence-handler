@@ -69,6 +69,12 @@
 			if ( targetTab ) {
 				setActiveTab( targetTab, tabs, panels );
 			}
+		} else {
+			// No restored tab — sync Save visibility to the default active tab.
+			var defaultActive = document.querySelector( '.gwp-tab.is-active' );
+			if ( defaultActive ) {
+				syncSaveVisibility( defaultActive.getAttribute( 'data-gwp-tab' ) );
+			}
 		}
 
 		tabs.forEach( function ( tab ) {
@@ -86,6 +92,43 @@
 				}
 			} );
 		} );
+
+		initStickyTabs();
+	}
+
+	/**
+	 * Toggle the .gwp-tabs--showing-save class on the nav so the Save CTA
+	 * is only visible when the License Keys tab is active.
+	 *
+	 * @param {string} tabKey The data-gwp-tab key of the now-active tab.
+	 */
+	function syncSaveVisibility( tabKey ) {
+		var nav = document.querySelector( '.gwp-tabs' );
+		if ( nav ) {
+			nav.classList.toggle( 'gwp-tabs--showing-save', tabKey === 'license-keys' );
+		}
+	}
+
+	/**
+	 * Add a .gwp-tabs--stuck class when the sticky tabs bar is pinned to
+	 * the top of the viewport, so we can deepen the shadow for elevation.
+	 *
+	 * Uses a 1px sentinel placed just above the bar; when that sentinel
+	 * scrolls out of view, the bar is stuck. Graceful no-op on browsers
+	 * without IntersectionObserver.
+	 */
+	function initStickyTabs() {
+		var nav = document.querySelector( '.gwp-tabs' );
+		if ( ! nav || ! ( 'IntersectionObserver' in window ) ) {
+			return;
+		}
+		var sentinel = document.createElement( 'div' );
+		sentinel.className = 'gwp-tabs__sentinel';
+		sentinel.style.cssText = 'height:1px;margin-bottom:-1px;';
+		nav.parentNode.insertBefore( sentinel, nav );
+		new IntersectionObserver( function ( entries ) {
+			nav.classList.toggle( 'gwp-tabs--stuck', ! entries[ 0 ].isIntersecting );
+		}, { rootMargin: '-32px 0px 0px 0px', threshold: [ 1 ] } ).observe( sentinel );
 	}
 
 	/**
@@ -115,6 +158,8 @@
 		if ( panel ) {
 			panel.classList.add( 'is-active' );
 		}
+
+		syncSaveVisibility( tabKey );
 	}
 
 	/**

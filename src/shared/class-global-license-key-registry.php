@@ -433,9 +433,10 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 					echo "<style>\n"
 						. ".gwp-tab-panel{display:none}"
 						. ".gwp-tab-panel.is-active{display:block}"
-						. ".gwp-tabs{display:flex;gap:6px;padding:6px;background:#fff;border:1px solid #dcdcde;border-radius:12px;margin:0 0 24px}"
-						. ".gwp-tab{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:8px;text-decoration:none;color:#495057;font-weight:500}"
-						. ".gwp-tab.is-active{background:#2271b1;color:#fff}"
+						. ".gwp-tabs{display:flex;align-items:center;gap:6px;padding:6px;background:#fff;border:1px solid #dcdcde;border-radius:12px;margin:0 0 24px;position:sticky;top:32px;z-index:50}"
+						. ".gwp-tab{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;margin:0;border:none;background:transparent;border-radius:8px;text-decoration:none;color:#495057;font-family:inherit;font-size:14px;font-weight:500;line-height:1.2;cursor:pointer}"
+						. ".gwp-tab.is-active,.gwp-tab--action{background:#327397;color:#fff;font-weight:600}"
+						. ".gwp-tab--action{margin-left:auto}"
 						. ".gwp-hero{padding:32px;border-radius:16px;margin:0 0 28px;background:linear-gradient(135deg,#1a5fb4 0%,#2d8f5f 100%);color:#fff}"
 						. ".gwp-plugin-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}"
 						. ".gwp-plugin-card{background:#fff;border:1px solid #dcdcde;border-radius:12px;padding:16px}"
@@ -587,6 +588,10 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 						<span class="dashicons dashicons-admin-network"></span>
 						<?php esc_html_e( 'License Keys', 'gravitywp-license-handler' ); ?>
 					</a>
+					<button type="submit" form="gwp-license-keys-form" name="submit" id="submit" class="gwp-tab gwp-tab--action">
+						<span class="dashicons dashicons-yes" aria-hidden="true"></span>
+						<?php esc_html_e( 'Save License Keys', 'gravitywp-license-handler' ); ?>
+					</button>
 				</nav>
 
 				<?php
@@ -601,7 +606,7 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 
 				<?php // ================ Tab 2: License Keys ================ ?>
 				<div class="gwp-tab-panel" data-gwp-panel="license-keys" role="tabpanel">
-					<form method="post" action="options.php">
+					<form id="gwp-license-keys-form" method="post" action="options.php">
 						<?php settings_fields( 'gravitywp_settings_group' ); ?>
 						<?php
 						// Individual keys are only meaningful for paid add-ons. Free plugins
@@ -616,9 +621,6 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 						?>
 						<?php self::render_global_license_card( $global_key, $global_info, $unlocked ); ?>
 						<?php self::render_individual_keys_card( $plugin_keys, $per_plugin_info, $paid_plugins ); ?>
-						<p class="gwp-form-actions">
-							<?php submit_button( __( 'Save License Keys', 'gravitywp-license-handler' ), 'primary large', 'submit', false, array( 'class' => 'button button-primary button-large' ) ); ?>
-						</p>
 					</form>
 				</div>
 
