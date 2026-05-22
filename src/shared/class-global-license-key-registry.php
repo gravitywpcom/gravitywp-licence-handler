@@ -75,7 +75,7 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 		public static function add_admin_menu() {
 			$page_title = __( 'GravityWP', 'gravitywp-license-handler' );
 			$menu_title = 'GravityWP';
-			$capability = 'manage_options';
+			$capability = 'gform_full_access';
 			$callback   = array( self::class, 'render_page' );
 
 			// Detect if Gravity Forms is loaded and accessible.
