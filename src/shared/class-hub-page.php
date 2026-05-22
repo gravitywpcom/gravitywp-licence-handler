@@ -423,7 +423,7 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Page' ) ) {
 		private static function render_locked_footer( $plugin, $slug ) {
 			$purchase_url = ! empty( $plugin['purchase_url'] )
 				? $plugin['purchase_url']
-				: 'https://gravitywp.com/pricing/?utm_source=hub&utm_medium=admin&utm_campaign=upgrade&utm_content=' . rawurlencode( $slug );
+				: 'https://gravitywp.com/add-ons/?utm_source=hub&utm_medium=admin&utm_campaign=upgrade&utm_content=' . rawurlencode( $slug );
 			$is_free      = ! empty( $plugin['is_free'] );
 
 			ob_start();
