@@ -40,17 +40,26 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
 
 		public static function ajax_install() {
 			$slug = self::verify_request( 'install_plugins' );
-			self::log( 'install start', array( 'slug' => $slug, 'user_id' => get_current_user_id() ) );
+			self::log(
+				'install start',
+				array(
+					'slug'    => $slug,
+					'user_id' => get_current_user_id(),
+				)
+			);
 
 			$plugin = Hub_Manager::get_plugin_data( $slug );
-			self::log( 'plugin fetched', array(
-				'slug'          => $slug,
-				'has_access'    => ! empty( $plugin['has_access'] ),
-				'is_free'       => ! empty( $plugin['is_free'] ),
-				'access_source' => $plugin['access_source'] ?? null,
-				'download_link' => $plugin['download_link'] ?? null,
-				'github_name'   => $plugin['github_name'] ?? null,
-			) );
+			self::log(
+				'plugin fetched',
+				array(
+					'slug'          => $slug,
+					'has_access'    => ! empty( $plugin['has_access'] ),
+					'is_free'       => ! empty( $plugin['is_free'] ),
+					'access_source' => $plugin['access_source'] ?? null,
+					'download_link' => $plugin['download_link'] ?? null,
+					'github_name'   => $plugin['github_name'] ?? null,
+				)
+			);
 
 			if ( ! $plugin || empty( $plugin['has_access'] ) ) {
 				self::fail( 403, Api_Error_Handler::message( 'insufficient_membership_level' ) );
@@ -85,18 +94,27 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
 				}
 			}
 
-			self::log( 'package resolved', array(
-				'slug'    => $slug,
-				'package' => $package,
-				'is_free' => ! empty( $plugin['is_free'] ),
-			) );
+			self::log(
+				'package resolved',
+				array(
+					'slug'    => $slug,
+					'package' => $package,
+					'is_free' => ! empty( $plugin['is_free'] ),
+				)
+			);
 
 			self::load_upgrader_includes();
 
 			// Idempotent: skip install if a valid plugin already lives at the slug.
 			$existing = self::find_installed_plugin_file( $slug );
 			if ( '' !== $existing ) {
-				self::log( 'idempotent hit', array( 'plugin_file' => $existing, 'is_active' => is_plugin_active( $existing ) ) );
+				self::log(
+					'idempotent hit',
+					array(
+						'plugin_file' => $existing,
+						'is_active'   => is_plugin_active( $existing ),
+					)
+				);
 				wp_clean_plugins_cache();
 				self::respond_success( $slug, $existing, is_plugin_active( $existing ) );
 				return;
@@ -105,7 +123,13 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
 			// Orphan-folder cleanup before extract.
 			$cleanup = self::cleanup_orphan_plugin_folder( $slug );
 			if ( is_wp_error( $cleanup ) ) {
-				self::log( 'cleanup failed', array( 'err' => $cleanup->get_error_code(), 'data' => $cleanup->get_error_data() ) );
+				self::log(
+					'cleanup failed',
+					array(
+						'err'  => $cleanup->get_error_code(),
+						'data' => $cleanup->get_error_data(),
+					)
+				);
 				self::fail( 500, self::format_wp_error( $cleanup ) );
 			} elseif ( true === $cleanup ) {
 				self::log( 'orphan removed', array( 'slug' => $slug ) );
@@ -127,12 +151,15 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
 
 			delete_transient( $lock_key );
 
-			self::log( 'upgrader done', array(
-				'package'   => $package,
-				'is_wp_err' => is_wp_error( $result ),
-				'skin_err'  => ( is_wp_error( $skin->result ) ) ? $skin->result->get_error_code() : null,
-				'skin_data' => ( is_wp_error( $skin->result ) ) ? $skin->result->get_error_data() : null,
-			) );
+			self::log(
+				'upgrader done',
+				array(
+					'package'   => $package,
+					'is_wp_err' => is_wp_error( $result ),
+					'skin_err'  => ( is_wp_error( $skin->result ) ) ? $skin->result->get_error_code() : null,
+					'skin_data' => ( is_wp_error( $skin->result ) ) ? $skin->result->get_error_data() : null,
+				)
+			);
 
 			// folder_exists retry: when the ZIP's internal folder name differs from
 			// the catalog slug, our slug-based cleanup misses the actual destination.
@@ -147,10 +174,13 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
 					$upgrader = new \Plugin_Upgrader( $skin );
 					$result   = $upgrader->install( $package );
 					delete_transient( $lock_key );
-					self::log( 'retry done', array(
-						'is_wp_err' => is_wp_error( $result ),
-						'skin_err'  => is_wp_error( $skin->result ) ? $skin->result->get_error_code() : null,
-					) );
+					self::log(
+						'retry done',
+						array(
+							'is_wp_err' => is_wp_error( $result ),
+							'skin_err'  => is_wp_error( $skin->result ) ? $skin->result->get_error_code() : null,
+						)
+					);
 				}
 			}
 
@@ -182,18 +212,28 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
 				self::fail( 400, __( 'Invalid plugin file.', 'gravitywp-license-handler' ) );
 			}
 
-			self::log( 'update start', array( 'slug' => $slug, 'plugin_file' => $plugin_file, 'user_id' => get_current_user_id() ) );
+			self::log(
+				'update start',
+				array(
+					'slug'        => $slug,
+					'plugin_file' => $plugin_file,
+					'user_id'     => get_current_user_id(),
+				)
+			);
 
 			$plugin = Hub_Manager::get_plugin_data( $slug );
-			self::log( 'plugin fetched', array(
-				'slug'            => $slug,
-				'has_access'      => ! empty( $plugin['has_access'] ),
-				'is_free'         => ! empty( $plugin['is_free'] ),
-				'access_source'   => $plugin['access_source'] ?? null,
-				'download_link'   => $plugin['download_link'] ?? null,
-				'github_name'     => $plugin['github_name'] ?? null,
-				'new_version'     => $plugin['new_version'] ?? null,
-			) );
+			self::log(
+				'plugin fetched',
+				array(
+					'slug'          => $slug,
+					'has_access'    => ! empty( $plugin['has_access'] ),
+					'is_free'       => ! empty( $plugin['is_free'] ),
+					'access_source' => $plugin['access_source'] ?? null,
+					'download_link' => $plugin['download_link'] ?? null,
+					'github_name'   => $plugin['github_name'] ?? null,
+					'new_version'   => $plugin['new_version'] ?? null,
+				)
+			);
 
 			if ( ! $plugin || empty( $plugin['has_access'] ) ) {
 				self::fail( 403, Api_Error_Handler::message( 'insufficient_membership_level' ) );
@@ -223,11 +263,14 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
 				}
 			}
 
-			self::log( 'package resolved', array(
-				'slug'    => $slug,
-				'package' => $package,
-				'is_free' => ! empty( $plugin['is_free'] ),
-			) );
+			self::log(
+				'package resolved',
+				array(
+					'slug'    => $slug,
+					'package' => $package,
+					'is_free' => ! empty( $plugin['is_free'] ),
+				)
+			);
 
 			if ( ! function_exists( 'get_plugins' ) ) {
 				require_once ABSPATH . 'wp-admin/includes/plugin.php';
@@ -242,7 +285,13 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
 				self::fail( 404, __( 'Plugin is not installed.', 'gravitywp-license-handler' ) );
 			}
 			if ( '' !== $target_version && version_compare( $installed_version, $target_version, '>=' ) ) {
-				self::log( 'already current', array( 'installed' => $installed_version, 'target' => $target_version ) );
+				self::log(
+					'already current',
+					array(
+						'installed' => $installed_version,
+						'target'    => $target_version,
+					)
+				);
 				self::respond_success( $slug, $plugin_file, is_plugin_active( $plugin_file ) );
 				return;
 			}
@@ -266,26 +315,31 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
 			// update_plugins transient (which the legacy bundled pluginUpdater
 			// poisons with a missing `package` field on customer sites running
 			// older addons).
-			$result = $upgrader->run( array(
-				'package'           => $package,
-				'destination'       => WP_PLUGIN_DIR,
-				'clear_destination' => true,
-				'clear_working'     => true,
-				'hook_extra'        => array(
-					'plugin' => $plugin_file,
-					'type'   => 'plugin',
-					'action' => 'update',
-				),
-			) );
+			$result = $upgrader->run(
+				array(
+					'package'           => $package,
+					'destination'       => WP_PLUGIN_DIR,
+					'clear_destination' => true,
+					'clear_working'     => true,
+					'hook_extra'        => array(
+						'plugin' => $plugin_file,
+						'type'   => 'plugin',
+						'action' => 'update',
+					),
+				)
+			);
 
 			delete_transient( $lock_key );
 
-			self::log( 'upgrader done', array(
-				'package'   => $package,
-				'is_wp_err' => is_wp_error( $result ),
-				'skin_err'  => ( is_wp_error( $skin->result ) ) ? $skin->result->get_error_code() : null,
-				'skin_data' => ( is_wp_error( $skin->result ) ) ? $skin->result->get_error_data() : null,
-			) );
+			self::log(
+				'upgrader done',
+				array(
+					'package'   => $package,
+					'is_wp_err' => is_wp_error( $result ),
+					'skin_err'  => ( is_wp_error( $skin->result ) ) ? $skin->result->get_error_code() : null,
+					'skin_data' => ( is_wp_error( $skin->result ) ) ? $skin->result->get_error_data() : null,
+				)
+			);
 
 			if ( is_wp_error( $skin->result ) ) {
 				self::fail( 500, self::format_wp_error( $skin->result ) );
@@ -305,7 +359,13 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
 			Hub_Manager::clear_cache();
 
 			$is_active = is_plugin_active( $plugin_file );
-			self::log( 'update success', array( 'plugin_file' => $plugin_file, 'is_active' => $is_active ) );
+			self::log(
+				'update success',
+				array(
+					'plugin_file' => $plugin_file,
+					'is_active'   => $is_active,
+				)
+			);
 
 			self::respond_success( $slug, $plugin_file, $is_active );
 		}
@@ -447,18 +507,27 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
 				)
 			);
 			if ( is_wp_error( $api ) ) {
-				self::log( 'plugins_api error', array( 'slug' => $wporg_slug, 'error' => $api->get_error_message() ) );
+				self::log(
+					'plugins_api error',
+					array(
+						'slug'  => $wporg_slug,
+						'error' => $api->get_error_message(),
+					)
+				);
 				return '';
 			}
 			if ( empty( $api->download_link ) ) {
 				self::log( 'plugins_api: no download_link', array( 'slug' => $wporg_slug ) );
 				return '';
 			}
-			self::log( 'plugins_api OK', array(
-				'slug'          => $wporg_slug,
-				'version'       => $api->version ?? '',
-				'download_link' => $api->download_link,
-			) );
+			self::log(
+				'plugins_api OK',
+				array(
+					'slug'          => $wporg_slug,
+					'version'       => $api->version ?? '',
+					'download_link' => $api->download_link,
+				)
+			);
 			return (string) $api->download_link;
 		}
 
@@ -634,16 +703,24 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
 				$footer_html = Hub_Page::render_card_footer_html( $plugin, $installed_plugins, $status );
 			}
 
-			wp_send_json_success( array(
-				'slug'        => $slug,
-				'plugin_file' => $plugin_file,
-				'is_active'   => (bool) $is_active,
-				'footer_html' => $footer_html,
-			) );
+			wp_send_json_success(
+				array(
+					'slug'        => $slug,
+					'plugin_file' => $plugin_file,
+					'is_active'   => (bool) $is_active,
+					'footer_html' => $footer_html,
+				)
+			);
 		}
 
 		private static function fail( $http, $message ) {
-			self::log( 'fail', array( 'http' => $http, 'msg' => $message ) );
+			self::log(
+				'fail',
+				array(
+					'http' => $http,
+					'msg'  => $message,
+				)
+			);
 			wp_send_json_error(
 				array( 'message' => (string) $message ),
 				(int) $http

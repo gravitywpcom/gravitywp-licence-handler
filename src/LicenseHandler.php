@@ -341,9 +341,9 @@ class LicenseHandler {
 		}
 
 		// 3. Legacy: check old per-plugin key from Gravity Forms addon settings.
-		//    This covers customers who entered the key in the old plugin settings
-		//    page and haven't migrated yet. We read it, USE it, AND auto-migrate it
-		//    so the next request uses the new storage directly.
+		// This covers customers who entered the key in the old plugin settings
+		// page and haven't migrated yet. We read it, USE it, AND auto-migrate it
+		// so the next request uses the new storage directly.
 		$legacy_key = $this->read_legacy_addon_key();
 		if ( ! empty( $legacy_key ) ) {
 			$this->auto_migrate_discovered_key( $legacy_key );
@@ -559,7 +559,7 @@ class LicenseHandler {
 	 * @return string HTML output.
 	 */
 	private static function render_status_html( $message, $type ) {
-		$map = array(
+		$map   = array(
 			'success' => array( '#27ae60', 'dashicons-yes-alt' ),
 			'warning' => array( '#f39c12', 'dashicons-info' ),
 			'danger'  => array( '#dc3232', 'dashicons-warning' ),

@@ -449,17 +449,17 @@ class Plugin_Updater {
 			$hub_plugin_data = \GravityWP\Shared\Hub_Manager::get_plugin_data( $this->slug );
 
 			if ( ! empty( $hub_plugin_data ) && ! empty( $hub_plugin_data['new_version'] ) ) {
-				$version_info = new stdClass();
-				$version_info->name        = $hub_plugin_data['name'] ?? '';
-				$version_info->slug        = $hub_plugin_data['slug'] ?? $this->slug;
-				$version_info->new_version = $hub_plugin_data['new_version'];
-				$version_info->url         = '';
-				$version_info->plugin      = $this->name;
-				$version_info->icons       = $hub_plugin_data['icons'] ?? [];
-				$version_info->banners     = $hub_plugin_data['banners'] ?? [];
-				$version_info->sections    = $hub_plugin_data['sections'] ?? [];
-				$version_info->requires    = $hub_plugin_data['requires'] ?? '';
-				$version_info->tested      = $hub_plugin_data['tested'] ?? '';
+				$version_info               = new stdClass();
+				$version_info->name         = $hub_plugin_data['name'] ?? '';
+				$version_info->slug         = $hub_plugin_data['slug'] ?? $this->slug;
+				$version_info->new_version  = $hub_plugin_data['new_version'];
+				$version_info->url          = '';
+				$version_info->plugin       = $this->name;
+				$version_info->icons        = $hub_plugin_data['icons'] ?? array();
+				$version_info->banners      = $hub_plugin_data['banners'] ?? array();
+				$version_info->sections     = $hub_plugin_data['sections'] ?? array();
+				$version_info->requires     = $hub_plugin_data['requires'] ?? '';
+				$version_info->tested       = $hub_plugin_data['tested'] ?? '';
 				$version_info->requires_php = $hub_plugin_data['requires_php'] ?? '';
 
 				// Only include download link if license covers this plugin.
@@ -505,7 +505,7 @@ class Plugin_Updater {
 			$no_update = false;
 			if ( version_compare( $this->version, $version_info->new_version, '<' ) ) {
 
-				$_transient_data->response[ $this->name ] = $version_info;
+				$_transient_data->response[ $this->name ]         = $version_info;
 				$_transient_data->response[ $this->name ]->plugin = $this->name;
 			} else {
 				$no_update              = new stdClass();

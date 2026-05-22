@@ -431,15 +431,15 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 				'admin_head',
 				function () {
 					echo "<style>\n"
-						. ".gwp-tab-panel{display:none}"
-						. ".gwp-tab-panel.is-active{display:block}"
-						. ".gwp-tabs{display:flex;align-items:center;gap:6px;padding:6px;background:#fff;border:1px solid #dcdcde;border-radius:12px;margin:0 0 24px;position:sticky;top:32px;z-index:50}"
-						. ".gwp-tab{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;margin:0;border:none;background:transparent;border-radius:8px;text-decoration:none;color:#495057;font-family:inherit;font-size:14px;font-weight:500;line-height:1.2;cursor:pointer}"
-						. ".gwp-tab.is-active,.gwp-tab--action{background:#327397;color:#fff;font-weight:600}"
-						. ".gwp-tab--action{margin-left:auto}"
-						. ".gwp-hero{padding:32px;border-radius:16px;margin:0 0 28px;background:linear-gradient(135deg,#1a5fb4 0%,#2d8f5f 100%);color:#fff}"
-						. ".gwp-plugin-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}"
-						. ".gwp-plugin-card{background:#fff;border:1px solid #dcdcde;border-radius:12px;padding:16px}"
+						. '.gwp-tab-panel{display:none}'
+						. '.gwp-tab-panel.is-active{display:block}'
+						. '.gwp-tabs{display:flex;align-items:center;gap:6px;padding:6px;background:#fff;border:1px solid #dcdcde;border-radius:12px;margin:0 0 24px;position:sticky;top:32px;z-index:50}'
+						. '.gwp-tab{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;margin:0;border:none;background:transparent;border-radius:8px;text-decoration:none;color:#495057;font-family:inherit;font-size:14px;font-weight:500;line-height:1.2;cursor:pointer}'
+						. '.gwp-tab.is-active,.gwp-tab--action{background:#327397;color:#fff;font-weight:600}'
+						. '.gwp-tab--action{margin-left:auto}'
+						. '.gwp-hero{padding:32px;border-radius:16px;margin:0 0 28px;background:linear-gradient(135deg,#1a5fb4 0%,#2d8f5f 100%);color:#fff}'
+						. '.gwp-plugin-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}'
+						. '.gwp-plugin-card{background:#fff;border:1px solid #dcdcde;border-radius:12px;padding:16px}'
 						. "</style>\n";
 				}
 			);
@@ -653,8 +653,8 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 			// Detect "single-addon key in the Global slot" up front so the hero
 			// doesn't shout "Your plugins are unlocked and ready to use." for
 			// a key that actually unlocks zero plugins via the global path.
-			$global_plan_type      = $global_info['plan_type'] ?? Plan_Types::UNKNOWN;
-			$global_status         = $global_info['status'] ?? '';
+			$global_plan_type       = $global_info['plan_type'] ?? Plan_Types::UNKNOWN;
+			$global_status          = $global_info['status'] ?? '';
 			$wrong_field_for_global = (
 				'valid' === $global_status
 				&& Plan_Types::SINGLE_ADDON === $global_plan_type
@@ -675,8 +675,8 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 				$title      = __( 'Wrong field for this license type', 'gravitywp-license-handler' );
 				$subtitle   = __( 'Your Single Add-on key belongs under Individual Plugin Keys, not the Global License Key field.', 'gravitywp-license-handler' );
 			} elseif ( $has_any_license ) {
-				$state         = 'active';
-				$global_valid  = ( 'valid' === $global_status );
+				$state        = 'active';
+				$global_valid = ( 'valid' === $global_status );
 
 				if ( $global_valid && ! $wrong_field_for_global ) {
 					$plan_badge = $global_plan_type;
@@ -709,7 +709,7 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 						$title    = __( 'License entered but not active', 'gravitywp-license-handler' );
 						$subtitle = __( 'Check the rows below for the specific reason.', 'gravitywp-license-handler' );
 					} else {
-						$title    = sprintf(
+						$title = sprintf(
 							/* translators: %d: count */
 							_n( '%d Individual License Active', '%d Individual Licenses Active', $valid_per, 'gravitywp-license-handler' ),
 							$valid_per
@@ -726,7 +726,13 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 			$cache_remaining = Hub_Manager::get_cache_ttl_remaining();
 			$cache_hours     = (int) floor( $cache_remaining / 3600 );
 			$cache_minutes   = (int) floor( ( $cache_remaining % 3600 ) / 60 );
-			$refresh_url     = add_query_arg( array( 'page' => self::PAGE_SLUG, 'refresh' => '1' ), admin_url( 'admin.php' ) );
+			$refresh_url     = add_query_arg(
+				array(
+					'page'    => self::PAGE_SLUG,
+					'refresh' => '1',
+				),
+				admin_url( 'admin.php' )
+			);
 
 			$astronaut_url = '';
 			$base_url      = self::get_assets_base_url();
@@ -961,7 +967,10 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 							class="gwp-input <?php echo $global_is_bad ? 'is-invalid' : ''; ?>"
 							placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 							data-gwp-validate="license-key"
-							<?php if ( $global_is_bad ) : ?>data-gwp-force-state="invalid"<?php endif; ?>
+							<?php
+							if ( $global_is_bad ) :
+								?>
+								data-gwp-force-state="invalid"<?php endif; ?>
 							autocomplete="off"
 						/>
 						<p class="description">
@@ -1155,7 +1164,8 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 								</tr>
 							</thead>
 							<tbody>
-								<?php foreach ( $all_plugins as $plugin ) :
+								<?php
+								foreach ( $all_plugins as $plugin ) :
 									$slug         = $plugin['slug'] ?? '';
 									$name         = $plugin['name'] ?? $slug;
 									$current_key  = $plugin_keys[ $slug ] ?? '';
@@ -1166,15 +1176,15 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 									// Delegate to the centralized interpreter. It cross-references the
 									// hub's raw `status` with the row's `has_access` + `access_source`
 									// and the embedded error map, producing one of:
-									//   ACTIVE | INACTIVE | INVALID | WRONG_PLUGIN | VIA_GLOBAL | EMPTY.
+									// ACTIVE | INACTIVE | INVALID | WRONG_PLUGIN | VIA_GLOBAL | EMPTY.
 									// This collapses what used to be three special-case branches and a
 									// silent "Active" lie when the key was for a different plugin.
 									$interp = Api_Error_Handler::interpret_license(
 										is_array( $license_data ) ? $license_data : array(),
 										array(
-											'has_access'    => $has_access,
+											'has_access' => $has_access,
 											'access_source' => $access_src,
-											'has_key'       => ! empty( $current_key ),
+											'has_key'    => ! empty( $current_key ),
 										)
 									);
 
@@ -1281,7 +1291,7 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 										array( 'active', 'via_global', 'no_key' ),
 										true
 									);
-									$show_alert_row = $is_bad_row || $has_inline_note;
+									$show_alert_row  = $is_bad_row || $has_inline_note;
 
 									// Map Api_Error_Handler::severity → CSS modifier so the alert
 									// matches its meaning (red for errors, yellow for warnings,
@@ -1330,7 +1340,10 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 												class="gwp-input <?php echo $is_bad_row ? 'is-invalid' : ''; ?>"
 												placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 												data-gwp-validate="license-key"
-												<?php if ( $is_bad_row ) : ?>data-gwp-force-state="invalid"<?php endif; ?>
+												<?php
+												if ( $is_bad_row ) :
+													?>
+													data-gwp-force-state="invalid"<?php endif; ?>
 												autocomplete="off"
 											/>
 										</td>

@@ -255,16 +255,16 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
 			// validator (rest_missing_callback_param / rest_invalid_param).
 			//
 			// - license_url is REQUIRED by the hub schema. home_url() returns
-			//   '' on installs that haven't set the siteurl option; defaulting
-			//   to a non-empty placeholder keeps the request well-formed even
-			//   in that edge case. The hub uses it only as an activation
-			//   identifier, so a placeholder is safe.
+			// '' on installs that haven't set the siteurl option; defaulting
+			// to a non-empty placeholder keeps the request well-formed even
+			// in that edge case. The hub uses it only as an activation
+			// identifier, so a placeholder is safe.
 			// - plugin_license_keys is typed `object` server-side. We only
-			//   include the key when populated AND assoc-keyed, so wp_remote_post's
-			//   form encoding produces `plugin_license_keys[slug]=key` (which
-			//   PHP's REST parser deserializes as an object). Numeric or empty
-			//   arrays serialize as `plugin_license_keys[0]=...` and trigger
-			//   rest_invalid_param — see Recipe H in the plan.
+			// include the key when populated AND assoc-keyed, so wp_remote_post's
+			// form encoding produces `plugin_license_keys[slug]=key` (which
+			// PHP's REST parser deserializes as an object). Numeric or empty
+			// arrays serialize as `plugin_license_keys[0]=...` and trigger
+			// rest_invalid_param — see Recipe H in the plan.
 			$license_url = home_url();
 			if ( empty( $license_url ) ) {
 				$license_url = site_url();
@@ -528,7 +528,7 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
 			$normalize = static function ( $s ) {
 				return preg_replace( '/[^a-z0-9]/i', '', strtolower( (string) $s ) );
 			};
-			$needle = $normalize( $name );
+			$needle    = $normalize( $name );
 			if ( '' === $needle ) {
 				return array();
 			}
@@ -669,7 +669,7 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
 				&& 'valid' === $data['license']['global']['status']
 				&& ! empty( $data['license']['global']['plan_type'] )
 			) {
-				$plan_type = (string) $data['license']['global']['plan_type'];
+				$plan_type   = (string) $data['license']['global']['plan_type'];
 				$unlock_slug = null;
 				if ( Plan_Types::SINGLE_ADDON === $plan_type ) {
 					$target = self::find_plugin_for_plan_name(

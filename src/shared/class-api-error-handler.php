@@ -74,12 +74,12 @@ if ( ! class_exists( '\GravityWP\Shared\Api_Error_Handler' ) ) {
 
 			self::$catalog = array(
 				// ── License-state codes (from PaddlePress) ─────────────────
-				'unregistered_license_domain' => array(
+				'unregistered_license_domain'   => array(
 					'severity' => self::SEVERITY_INFO,
 					'blocking' => false, // Becomes blocking only with can_not_add_new_domain.
 					'message'  => __( 'Activating this site on your license…', 'gravitywp-license-handler' ),
 				),
-				'can_not_add_new_domain'      => array(
+				'can_not_add_new_domain'        => array(
 					'severity' => self::SEVERITY_ERROR,
 					'blocking' => true,
 					'message'  => __( 'Your license is at its site limit. Deactivate another site or upgrade your plan.', 'gravitywp-license-handler' ),
@@ -89,81 +89,81 @@ if ( ! class_exists( '\GravityWP\Shared\Api_Error_Handler' ) ) {
 					'blocking' => true,
 					'message'  => __( "This license doesn't cover this plugin.", 'gravitywp-license-handler' ),
 				),
-				'invalid_license_or_domain'   => array(
+				'invalid_license_or_domain'     => array(
 					'severity' => self::SEVERITY_ERROR,
 					'blocking' => true,
 					'message'  => __( 'License invalid for this site. Check the key or contact support.', 'gravitywp-license-handler' ),
 				),
-				'no_key'                      => array(
+				'no_key'                        => array(
 					'severity' => self::SEVERITY_INFO,
 					'blocking' => true,
 					'message'  => __( 'No license key entered.', 'gravitywp-license-handler' ),
 				),
 				// PaddlePress emits this when the key isn't in the payments
 				// table at all (typo, deleted, never existed).
-				'missing_license_key'         => array(
+				'missing_license_key'           => array(
 					'severity' => self::SEVERITY_ERROR,
 					'blocking' => true,
 					'message'  => __( "We couldn't find this license key. Double-check that you copied it correctly from your purchase email, or contact support.", 'gravitywp-license-handler' ),
 				),
-				'expired_license_key'         => array(
+				'expired_license_key'           => array(
 					'severity' => self::SEVERITY_ERROR,
 					'blocking' => true,
 					'message'  => __( 'This license key has expired. Renew it to continue receiving updates and use the key on new sites.', 'gravitywp-license-handler' ),
 				),
-				'blocked_license_domain'      => array(
+				'blocked_license_domain'        => array(
 					'severity' => self::SEVERITY_ERROR,
 					'blocking' => true,
 					'message'  => __( 'This site has been blocked for this license. Contact support if you believe this is a mistake.', 'gravitywp-license-handler' ),
 				),
-				'invalid_product'             => array(
+				'invalid_product'               => array(
 					'severity' => self::SEVERITY_ERROR,
 					'blocking' => true,
 					'message'  => __( "This license key isn't valid for this product.", 'gravitywp-license-handler' ),
 				),
 
 				// ── Transport / network codes (raised by Hub_Manager) ──────
-				'server_error'                => array(
+				'server_error'                  => array(
 					'severity' => self::SEVERITY_ERROR,
 					'blocking' => true,
 					'message'  => __( 'License server unavailable. Try again in a moment.', 'gravitywp-license-handler' ),
 				),
-				'cloudflare_blocked'          => array(
+				'cloudflare_blocked'            => array(
 					'severity' => self::SEVERITY_ERROR,
 					'blocking' => true,
 					'message'  => __( 'Your hosting provider blocked the license check (Cloudflare). Contact your host to allow requests to my.gravitywp.com.', 'gravitywp-license-handler' ),
 				),
-				'network_timeout'             => array(
+				'network_timeout'               => array(
 					'severity' => self::SEVERITY_ERROR,
 					'blocking' => true,
 					'message'  => __( "Couldn't reach the license server. Check your internet connection and try again.", 'gravitywp-license-handler' ),
 				),
-				'http_5xx'                    => array(
+				'http_5xx'                      => array(
 					'severity' => self::SEVERITY_ERROR,
 					'blocking' => true,
 					/* translators: %d: HTTP status code */
 					'message'  => __( 'License server returned an error (HTTP %d). Try again shortly.', 'gravitywp-license-handler' ),
 				),
-				'http_4xx'                    => array(
+				'http_4xx'                      => array(
 					'severity' => self::SEVERITY_ERROR,
 					'blocking' => true,
 					/* translators: %d: HTTP status code */
 					'message'  => __( 'License request rejected (HTTP %d).', 'gravitywp-license-handler' ),
 				),
-				'malformed_response'          => array(
+				'malformed_response'            => array(
 					'severity' => self::SEVERITY_ERROR,
 					'blocking' => true,
 					'message'  => __( 'Unexpected response from the license server. Contact support if this persists.', 'gravitywp-license-handler' ),
 				),
 
 				// ── REST validator codes (when our request is malformed) ───
-				'rest_missing_callback_param' => array(
+				'rest_missing_callback_param'   => array(
 					'severity' => self::SEVERITY_ERROR,
 					'blocking' => true,
 					/* translators: %s: parameter name */
 					'message'  => __( 'Missing required field: %s. This is a bug — please report it.', 'gravitywp-license-handler' ),
 				),
-				'rest_invalid_param'          => array(
+				'rest_invalid_param'            => array(
 					'severity' => self::SEVERITY_ERROR,
 					'blocking' => true,
 					/* translators: %s: parameter name */
@@ -171,54 +171,54 @@ if ( ! class_exists( '\GravityWP\Shared\Api_Error_Handler' ) ) {
 				),
 
 				// ── Install / update upgrader codes ────────────────────────
-				'folder_exists'               => array(
+				'folder_exists'                 => array(
 					'severity' => self::SEVERITY_ERROR,
 					'blocking' => true,
 					'message'  => __( 'A plugin folder with this name already exists. Remove the orphan folder via FTP and retry.', 'gravitywp-license-handler' ),
 				),
-				'download_failed'             => array(
+				'download_failed'               => array(
 					'severity' => self::SEVERITY_ERROR,
 					'blocking' => true,
 					'message'  => __( "Couldn't download the plugin package. Check your license or try again.", 'gravitywp-license-handler' ),
 				),
-				'filesystem_requires_ftp'     => array(
+				'filesystem_requires_ftp'       => array(
 					'severity' => self::SEVERITY_ERROR,
 					'blocking' => true,
 					'message'  => __( 'This site needs FTP credentials to install plugins. Install via Plugins → Add New instead.', 'gravitywp-license-handler' ),
 				),
-				'operation_in_progress'       => array(
+				'operation_in_progress'         => array(
 					'severity' => self::SEVERITY_WARN,
 					'blocking' => true,
 					'message'  => __( 'Another install or update is already running. Wait a few seconds and try again.', 'gravitywp-license-handler' ),
 				),
-				'security_check_failed'       => array(
+				'security_check_failed'         => array(
 					'severity' => self::SEVERITY_ERROR,
 					'blocking' => true,
 					'message'  => __( 'Security check failed. Reload the page and try again.', 'gravitywp-license-handler' ),
 				),
 
 				// ── UI-state codes (raised by interpret_license) ───────────
-				'wrong_plugin_key'            => array(
+				'wrong_plugin_key'              => array(
 					'severity' => self::SEVERITY_WARN,
 					'blocking' => false,
-					'message'  => __( "This key is for a different plugin — move it to the matching row.", 'gravitywp-license-handler' ),
+					'message'  => __( 'This key is for a different plugin — move it to the matching row.', 'gravitywp-license-handler' ),
 				),
-				'wrong_field_for_plan_type'   => array(
+				'wrong_field_for_plan_type'     => array(
 					'severity' => self::SEVERITY_WARN,
 					'blocking' => true,
 					'message'  => __( 'This looks like a Single Add-on key. Add it under Individual Plugin Keys instead.', 'gravitywp-license-handler' ),
 				),
-				'global_key_in_per_plugin'    => array(
+				'global_key_in_per_plugin'      => array(
 					'severity' => self::SEVERITY_INFO,
 					'blocking' => false,
 					'message'  => __( 'This is a multi-plugin license (All Access / Agency / List Add-ons). It works here, and it actually unlocks every plugin in your account on its own — you don\'t need to add it to other rows. For clarity, consider moving it to the Global License Key field instead.', 'gravitywp-license-handler' ),
 				),
-				'via_global'                  => array(
+				'via_global'                    => array(
 					'severity' => self::SEVERITY_SUCCESS,
 					'blocking' => false,
 					'message'  => __( 'Covered by your Global License Key.', 'gravitywp-license-handler' ),
 				),
-				'active'                      => array(
+				'active'                        => array(
 					'severity' => self::SEVERITY_SUCCESS,
 					'blocking' => false,
 					'message'  => __( 'Active', 'gravitywp-license-handler' ),
@@ -316,7 +316,7 @@ if ( ! class_exists( '\GravityWP\Shared\Api_Error_Handler' ) ) {
 			// WordPress wraps cURL CURLE_OPERATION_TIMEDOUT (28) and
 			// CURLE_COULDNT_RESOLVE_HOST (6) all into 'http_request_failed',
 			// so we have to inspect the message string to differentiate.
-			$msg  = strtolower( (string) $err->get_error_message() );
+			$msg = strtolower( (string) $err->get_error_message() );
 			if ( false !== strpos( $msg, 'timed out' ) || false !== strpos( $msg, 'timeout' ) ) {
 				return 'network_timeout';
 			}
@@ -419,7 +419,7 @@ if ( ! class_exists( '\GravityWP\Shared\Api_Error_Handler' ) ) {
 			// the user the key is a multi-plugin license and that they can
 			// move it to Global for clarity. The renderer detects the
 			// non-'active' primary_code and emits the note.
-			$plan_type = isset( $license_data['plan_type'] ) ? (string) $license_data['plan_type'] : '';
+			$plan_type            = isset( $license_data['plan_type'] ) ? (string) $license_data['plan_type'] : '';
 			$is_multi_plugin_plan = in_array(
 				$plan_type,
 				array( Plan_Types::ALL_ACCESS, Plan_Types::AGENCY, Plan_Types::LIST_ADDONS ),
@@ -442,12 +442,12 @@ if ( ! class_exists( '\GravityWP\Shared\Api_Error_Handler' ) ) {
 			// wrong-plugin determination. The hub returns has_access=false
 			// for two very different conditions:
 			//
-			//   (a) Wrong product — key activated fine, but its plan doesn't
-			//       grant download permission to this plugin. The user put
-			//       the key in the wrong row.
-			//   (b) Activation failed — site limit reached, insufficient
-			//       membership level, license expired on the server side.
-			//       The key is for the right plugin; it just can't run here.
+			// (a) Wrong product — key activated fine, but its plan doesn't
+			// grant download permission to this plugin. The user put
+			// the key in the wrong row.
+			// (b) Activation failed — site limit reached, insufficient
+			// membership level, license expired on the server side.
+			// The key is for the right plugin; it just can't run here.
 			//
 			// PaddlePress only distinguishes these via the embedded `errors`
 			// map. So we check it FIRST. If we find a blocking error, the
@@ -530,7 +530,7 @@ if ( ! class_exists( '\GravityWP\Shared\Api_Error_Handler' ) ) {
 		 * @return array{plan_type:string, slug:?string}
 		 */
 		public static function detect_key_destination( $key ) {
-			$key = (string) $key;
+			$key     = (string) $key;
 			$default = array(
 				'plan_type' => Plan_Types::UNKNOWN,
 				'slug'      => null,
@@ -584,12 +584,16 @@ if ( ! class_exists( '\GravityWP\Shared\Api_Error_Handler' ) ) {
 		 */
 		public static function remember_key_plan_type( $key, $plan_type, $unlock_slug = null ) {
 			$key = (string) $key;
-			if ( '' === $key || ! in_array( $plan_type, array(
-				Plan_Types::AGENCY,
-				Plan_Types::ALL_ACCESS,
-				Plan_Types::LIST_ADDONS,
-				Plan_Types::SINGLE_ADDON,
-			), true ) ) {
+			if ( '' === $key || ! in_array(
+				$plan_type,
+				array(
+					Plan_Types::AGENCY,
+					Plan_Types::ALL_ACCESS,
+					Plan_Types::LIST_ADDONS,
+					Plan_Types::SINGLE_ADDON,
+				),
+				true
+			) ) {
 				return;
 			}
 			$seen = get_option( self::SEEN_KEYS_OPTION, array() );

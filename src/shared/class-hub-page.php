@@ -424,7 +424,7 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Page' ) ) {
 			$purchase_url = ! empty( $plugin['purchase_url'] )
 				? $plugin['purchase_url']
 				: 'https://gravitywp.com/pricing/?utm_source=hub&utm_medium=admin&utm_campaign=upgrade&utm_content=' . rawurlencode( $slug );
-			$is_free = ! empty( $plugin['is_free'] );
+			$is_free      = ! empty( $plugin['is_free'] );
 
 			ob_start();
 			?>
