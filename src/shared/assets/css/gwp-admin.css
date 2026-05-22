@@ -120,8 +120,8 @@
 .gwp-hero__astronaut {
 	position: absolute;
 	top: 50%;
-	right: 32px;
-	height: 130%;
+	right: 50px;
+	height: 100%;
 	max-height: 280px;
 	width: auto;
 	transform: translateY(-50%) rotate(8deg);
