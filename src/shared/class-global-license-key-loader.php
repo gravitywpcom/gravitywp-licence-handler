@@ -110,7 +110,7 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Loader' ) ) {
 			if ( file_exists( $hub_ajax_file ) ) {
 				require_once $hub_ajax_file;
 				if ( class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
-					\GravityWP\Shared\Hub_Ajax::init();
+					\GravityWP\Shared\Hub_Ajax::init( $last['addon_class'] );
 				}
 			}
 

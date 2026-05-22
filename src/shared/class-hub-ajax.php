@@ -21,7 +21,11 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
 
 		private static $registered = false;
 
-		public static function init() {
+		private static $addon_class = '';
+
+		public static function init( $gwp_addon_class = '' ) {
+			self::$addon_class = (string) $gwp_addon_class;
+
 			if ( self::$registered ) {
 				return;
 			}
@@ -458,13 +462,37 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Ajax' ) ) {
 			return (string) $api->download_link;
 		}
 
-		/** Write a diagnostic line to wp-content/debug.log (always — short lines). */
+		/** Write a diagnostic line through the Gravity Forms add-on logger. */
 		private static function log( $msg, $context = array() ) {
+			if ( '' === self::$addon_class || ! class_exists( self::$addon_class ) || ! method_exists( self::$addon_class, 'get_instance' ) ) {
+				return;
+			}
+
+			$addon = call_user_func( array( self::$addon_class, 'get_instance' ) );
+			if ( ! is_object( $addon ) || ! method_exists( $addon, 'log_debug' ) ) {
+				return;
+			}
+
 			$line = '[GWP_HUB_AJAX] ' . $msg;
 			if ( ! empty( $context ) ) {
-				$line .= ' ' . wp_json_encode( $context );
+				$line .= ' ' . wp_json_encode( self::redact_log_context( $context ) );
 			}
-			error_log( $line );
+			$addon->log_debug( $line );
+		}
+
+		/** Redact signed/sensitive package URLs from log context. */
+		private static function redact_log_context( $context ) {
+			if ( is_array( $context ) ) {
+				foreach ( $context as $key => $value ) {
+					if ( in_array( $key, array( 'package', 'download_link' ), true ) ) {
+						$context[ $key ] = '[redacted]';
+						continue;
+					}
+					$context[ $key ] = self::redact_log_context( $value );
+				}
+			}
+
+			return $context;
 		}
 
 		/** Flatten a WP_Error to a single readable line including data + child errors. */
