@@ -1,3 +1,24 @@
+= 2.1.0 =
+- NEW: Centralized Hub system — single API request returns license info + ALL plugins data.
+- NEW: Support for both Global License Key (All Access, List Add-ons, Agency) and Individual Plugin Keys (Single Add-ons).
+- NEW: Auto-detection of plan type from the server (All Access, List Add-ons, Single Add-on, Agency).
+- NEW: GravityWP Settings page with tabbed interface (Global / Individual Keys / Overview).
+- NEW: GravityWP Hub catalog page with modern card-based layout.
+- NEW: Hub_Manager with 12-hour cache reduces API requests from 20+/day to 2/day per customer.
+- NEW: Stale cache fallback when API is unreachable (Cloudflare blocks, network errors, etc.).
+- NEW: Concurrent request lock to prevent duplicate API calls from multiple plugins.
+- NEW: Auto-migration — legacy per-plugin keys silently migrate to Global or Individual storage.
+- NEW: Access source badges on plugin cards (Global vs Individual).
+- CHANGED: Plugin settings pages no longer show a license input — all keys managed centrally.
+- CHANGED: LicenseHandler uses Hub_Manager for validation when available.
+- CHANGED: Update checks and download links come from the hub cache (zero extra API calls).
+
+= 2.0.6 =
+- Implementing the global licensed key.
+
+= 2.0.5 =
+- Fix non unique #id in plugin setting.
+
 = 2.0.4 =
 - Optimizing the validation function caches the result.
 
