@@ -30,7 +30,7 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
 		 *
 		 * @var string
 		 */
-		private static $hub_api_url = 'https://stg-mygravitywpcom-mygwpstage.kinsta.cloud/wp-json/paddlepress-api/v1/hub';
+		private static $hub_api_url = 'https://my.gravitywp.com/wp-json/paddlepress-api/v1/hub';
 
 		/**
 		 * Cache key in wp_options.
