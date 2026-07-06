@@ -1,1 +1,5 @@
 phpcs.xml
+WRONG-PLAN-FIX-PLAN.md
+docs/
+endpoint/
+
