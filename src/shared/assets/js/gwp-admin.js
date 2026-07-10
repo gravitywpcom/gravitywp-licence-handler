@@ -78,6 +78,12 @@
 		}
 
 		tabs.forEach( function ( tab ) {
+			// The Save button shares the .gwp-tab class for styling but has no
+			// data-gwp-tab attribute — it must perform its native form submit,
+			// not be intercepted as a tab.
+			if ( ! tab.hasAttribute( 'data-gwp-tab' ) ) {
+				return;
+			}
 			tab.addEventListener( 'click', function ( e ) {
 				e.preventDefault();
 				setActiveTab( tab, tabs, panels );
@@ -325,6 +331,16 @@
 				}
 				if ( footer && payload.data && payload.data.footer_html ) {
 					footer.innerHTML = payload.data.footer_html;
+				}
+				// Update succeeded — drop the now-stale "Update available" notice
+				// from the card header (the AJAX response only re-renders the
+				// footer, not the header).
+				if ( action === 'update' && footer ) {
+					var card = footer.closest( '.gwp-plugin-card' );
+					var notice = card && card.querySelector( '.gwp-plugin-card__update-notice' );
+					if ( notice ) {
+						notice.remove();
+					}
 				}
 			} )
 			.catch( function ( err ) {

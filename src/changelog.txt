@@ -1,3 +1,7 @@
+= 2.1.1 =
+- FIX: "Save License Keys" button did nothing — the tab script intercepted its click (shared .gwp-tab class) and cancelled the form submit. Tab handler now only binds to real tabs.
+- FIX: "Update available" notice stayed on a plugin card after a successful AJAX update. It's now removed once the update succeeds.
+
 = 2.1.0 =
 - NEW: Centralized Hub system — single API request returns license info + ALL plugins data.
 - NEW: Support for both Global License Key (All Access, List Add-ons, Agency) and Individual Plugin Keys (Single Add-ons).

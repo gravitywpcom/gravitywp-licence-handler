@@ -22,7 +22,7 @@ defined( 'ABSPATH' ) || die();
  * - Uses the Hub_Manager cache for zero-extra-API-call license checks.
  * - Auto-migrates legacy per-plugin keys from addon settings.
  *
- * @version 2.1.0
+ * @version 2.1.1
  */
 class LicenseHandler {
 
@@ -59,7 +59,7 @@ class LicenseHandler {
 	 *
 	 * @var string
 	 */
-	private $version = '2.1.0';
+	private $version = '2.1.1';
 
 	/**
 	 * WP Override flag
