@@ -1,3 +1,6 @@
+= 2.1.2 =
+- only version bump.
+
 = 2.1.1 =
 - FIX: "Save License Keys" button did nothing — the tab script intercepted its click (shared .gwp-tab class) and cancelled the form submit. Tab handler now only binds to real tabs.
 - FIX: "Update available" notice stayed on a plugin card after a successful AJAX update. It's now removed once the update succeeds.
