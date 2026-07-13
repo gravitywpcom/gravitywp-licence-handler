@@ -299,6 +299,7 @@ class LicenseHandler {
 
 			if ( $has_access ) {
 				remove_action( 'admin_notices', array( $this, 'action_admin_notices' ) );
+				$this->remove_license_notice();
 			} else {
 				add_action( 'admin_notices', array( $this, 'action_admin_notices' ) );
 			}
@@ -439,6 +440,14 @@ class LicenseHandler {
 	 * @return void
 	 */
 	public function action_admin_notices() {
+		// Defensive: sticky GF notices can outlive an old handler version. If
+		// the Hub now grants this addon access, consume any stale notice instead
+		// of re-adding it.
+		if ( class_exists( '\GravityWP\Shared\Hub_Manager' ) && \GravityWP\Shared\Hub_Manager::has_access( $this->_addon_slug ) ) {
+			$this->remove_license_notice();
+			return;
+		}
+
 		$global_settings_url = admin_url( 'admin.php?page=gravitywp' );
 		$hub_url             = $global_settings_url; // Single page now.
 		$site_slug           = $this->_addon_class::get_instance()->gwp_site_slug;
@@ -464,6 +473,37 @@ class LicenseHandler {
 		$key = $this->_addon_slug . '_license_message_notice';
 
 		GFCommon::add_dismissible_message( $message, $key, 'warning', false, true );
+	}
+
+	/**
+	 * Remove stale Gravity Forms sticky license notices for this addon.
+	 *
+	 * Older bundled handlers stored notices as sticky GF dismissible messages.
+	 * Those messages persist until explicitly dismissed/removed, so a site can
+	 * keep seeing "license has not been activated" after a Global License Key
+	 * starts covering the addon. Call this whenever access is confirmed.
+	 *
+	 * @since 2.1.3
+	 * @return void
+	 */
+	public function remove_license_notice() {
+		if ( ! class_exists( 'GFCommon' ) || empty( $this->_addon_slug ) ) {
+			return;
+		}
+
+		GFCommon::remove_dismissible_message( $this->_addon_slug . '_license_message_notice' );
+
+		// Also remove canonical/alternate keys when the current GF addon slug is
+		// a legacy PaddlePress download_tag (e.g. gravitywpapiconnector) but a
+		// newer UI uses github_name/canonical slug (e.g. gravitywp-api-connector).
+		if ( class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
+			$plugin = \GravityWP\Shared\Hub_Manager::get_plugin_data( $this->_addon_slug );
+			foreach ( array( 'slug', 'download_tag', 'github_name' ) as $field ) {
+				if ( ! empty( $plugin[ $field ] ) && is_string( $plugin[ $field ] ) ) {
+					GFCommon::remove_dismissible_message( $plugin[ $field ] . '_license_message_notice' );
+				}
+			}
+		}
 	}
 
 	/**
@@ -617,7 +657,7 @@ class LicenseHandler {
 		// Prefer Hub_Manager check (supports both key types).
 		if ( class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
 			if ( \GravityWP\Shared\Hub_Manager::has_access( $this->_addon_slug ) ) {
-				GFCommon::remove_dismissible_message( $this->_addon_slug . '_license_message_notice' );
+				$this->remove_license_notice();
 				return true;
 			}
 			// If no key at all, return null (neutral state), else false (red).
@@ -637,7 +677,7 @@ class LicenseHandler {
 		}
 
 		if ( $this->_license_handler && $this->_license_handler->gwp_is_valid( true, $key ) ) {
-			GFCommon::remove_dismissible_message( $this->_addon_slug . '_license_message_notice' );
+			$this->remove_license_notice();
 			return true;
 		}
 
