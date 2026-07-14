@@ -1,3 +1,7 @@
+= 2.1.3 =
+- FIX: Stale "Your … license has not been activated" admin notices now disappear automatically once a valid license key covers the plugin. They were stored as sticky Gravity Forms messages (gform_sticky_admin_messages) by older bundled handler versions and nothing ever removed them. Covered notices are now suppressed at display time and purged from the database.
+- FIX: License lookups by legacy addon slug (e.g. 'gravitywpapiconnector') failed because the hub matcher only compared the canonical slug. Hub_Manager::get_plugin_data() now also matches download_tag and github_name, so has_access()/notice removal work for legacy-slug add-ons.
+
 = 2.1.2 =
 - only version bump.
 
