@@ -83,14 +83,30 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 		public static function add_admin_menu() {
 			$page_title = __( 'GravityWP', 'gravitywp-license-handler' );
 			$menu_title = 'GravityWP';
-			$capability = 'gform_full_access';
 			$callback   = array( self::class, 'render_page' );
 
 			// Detect if Gravity Forms is loaded and accessible.
 			global $admin_page_hooks;
 			$gf_active = ( isset( $admin_page_hooks['gf_edit_forms'] ) || class_exists( '\GFForms' ) );
 
-			if ( $gf_active && current_user_can( 'gform_full_access' ) ) {
+			// With the Members plugin active, GF only auto-grants gform_full_access
+			// to administrators whose role has NO granular GF caps, so a hardcoded
+			// gform_full_access check hides the menu for admins with granular caps.
+			// Resolve a capability the current user actually holds instead.
+			$caps = array( 'gform_full_access','gravityforms_view_addons' );
+
+			if ( $gf_active && class_exists( '\GFCommon' ) ) {
+				$user_can   = \GFCommon::current_user_can_any( $caps );
+				$capability = \GFCommon::current_user_can_which( $caps );
+				if ( '' === $capability ) {
+					$capability = 'gform_full_access';
+				}
+			} else {
+				$user_can   = current_user_can( 'manage_options' );
+				$capability = 'manage_options';
+			}
+
+			if ( $gf_active && $user_can ) {
 				// Preferred: nest under Gravity Forms menu.
 				add_submenu_page(
 					'gf_edit_forms',
