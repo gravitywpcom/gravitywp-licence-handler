@@ -383,6 +383,9 @@ class Plugin_Updater {
 
 			if ( $has_access ) {
 				remove_action( 'admin_notices', array( $this->handler_class, 'action_admin_notices' ) );
+				if ( is_object( $this->handler_class ) && method_exists( $this->handler_class, 'remove_license_notice' ) ) {
+					$this->handler_class->remove_license_notice();
+				}
 			} else {
 				add_action( 'admin_notices', array( $this->handler_class, 'action_admin_notices' ) );
 			}
@@ -404,6 +407,9 @@ class Plugin_Updater {
 
 		if ( $this->gwp_is_valid( false, $license_key ) ) {
 			remove_action( 'admin_notices', array( $this->handler_class, 'action_admin_notices' ) );
+			if ( is_object( $this->handler_class ) && method_exists( $this->handler_class, 'remove_license_notice' ) ) {
+				$this->handler_class->remove_license_notice();
+			}
 		} else {
 			add_action( 'admin_notices', array( $this->handler_class, 'action_admin_notices' ) );
 		}

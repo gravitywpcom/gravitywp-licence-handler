@@ -62,6 +62,14 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 			add_action( 'admin_menu', array( self::class, 'add_admin_menu' ), 98 );
 			add_action( 'admin_init', array( self::class, 'register_settings' ) );
 			add_action( 'admin_enqueue_scripts', array( self::class, 'enqueue_assets' ) );
+
+			// Hide + purge stale "license has not been activated" sticky GF
+			// notices for plugins the current license covers. The filter
+			// suppresses them at read time (old bundled handlers ≤2.0.x
+			// re-add them on every admin load); the admin_init sweep cleans
+			// the stored option itself.
+			add_filter( 'option_gform_sticky_admin_messages', array( self::class, 'filter_covered_license_notices' ) );
+			add_action( 'admin_init', array( self::class, 'cleanup_stale_license_notices' ), 20 );
 		}
 
 		/**
@@ -75,14 +83,30 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 		public static function add_admin_menu() {
 			$page_title = __( 'GravityWP', 'gravitywp-license-handler' );
 			$menu_title = 'GravityWP';
-			$capability = 'gform_full_access';
 			$callback   = array( self::class, 'render_page' );
 
 			// Detect if Gravity Forms is loaded and accessible.
 			global $admin_page_hooks;
 			$gf_active = ( isset( $admin_page_hooks['gf_edit_forms'] ) || class_exists( '\GFForms' ) );
 
-			if ( $gf_active && current_user_can( 'gform_full_access' ) ) {
+			// With the Members plugin active, GF only auto-grants gform_full_access
+			// to administrators whose role has NO granular GF caps, so a hardcoded
+			// gform_full_access check hides the menu for admins with granular caps.
+			// Resolve a capability the current user actually holds instead.
+			$caps = array( 'gform_full_access','gravityforms_view_addons' );
+
+			if ( $gf_active && class_exists( '\GFCommon' ) ) {
+				$user_can   = \GFCommon::current_user_can_any( $caps );
+				$capability = \GFCommon::current_user_can_which( $caps );
+				if ( '' === $capability ) {
+					$capability = 'gform_full_access';
+				}
+			} else {
+				$user_can   = current_user_can( 'manage_options' );
+				$capability = 'manage_options';
+			}
+
+			if ( $gf_active && $user_can ) {
 				// Preferred: nest under Gravity Forms menu.
 				add_submenu_page(
 					'gf_edit_forms',
@@ -311,6 +335,147 @@ if ( ! class_exists( '\GravityWP\Shared\Global_License_Key_Registry' ) ) {
 			}
 
 			return $clean;
+		}
+
+		/**
+		 * Suffix used by every license-handler version for its sticky GF
+		 * "license has not been activated" admin notice key.
+		 *
+		 * @var string
+		 */
+		const LICENSE_NOTICE_SUFFIX = '_license_message_notice';
+
+		/**
+		 * Filter callback for option_gform_sticky_admin_messages.
+		 *
+		 * Strips `{slug}_license_message_notice` entries for plugins the hub
+		 * reports as covered (has_access). Suppression happens at read time,
+		 * so stale notices vanish no matter which (possibly old, bundled)
+		 * handler copy wrote them or keeps re-adding them. Because Gravity
+		 * Forms' Dismissable_Messages::add() does a read-modify-write on the
+		 * same option, subsequent writes also persist the cleaned array.
+		 *
+		 * Coverage comes from the CACHED hub data only — never triggers an
+		 * HTTP request inside an option filter.
+		 *
+		 * @since 2.1.3
+		 * @param mixed $value The option value.
+		 * @return mixed Filtered value.
+		 */
+		public static function filter_covered_license_notices( $value ) {
+			if ( empty( $value ) || ! is_array( $value ) ) {
+				return $value;
+			}
+
+			$covered = self::get_covered_notice_slugs();
+			if ( empty( $covered ) ) {
+				return $value;
+			}
+
+			return self::strip_covered_license_entries( $value, $covered );
+		}
+
+		/**
+		 * Remove covered license notices from the stored option itself.
+		 *
+		 * The display filter above keeps them invisible; this sweep keeps the
+		 * gform_sticky_admin_messages option clean so stale entries don't pile
+		 * up in the database. Runs on admin_init and after every fresh hub
+		 * fetch (see Hub_Manager::fetch_and_cache()).
+		 *
+		 * Only entries whose plugin the hub reports with has_access are
+		 * removed — uncovered or unknown plugins keep their notice.
+		 *
+		 * @since 2.1.3
+		 * @return void
+		 */
+		public static function cleanup_stale_license_notices() {
+			$covered = self::get_covered_notice_slugs();
+			if ( empty( $covered ) ) {
+				return;
+			}
+
+			// Suspend our own display filter for the whole read-and-write:
+			// reading through it would make the sweep a no-op (entries already
+			// stripped), and update_option() compares against a get_option()
+			// read — filtered, the old value would equal the cleaned one and
+			// the write would be skipped, leaving the stored option dirty.
+			$filter_cb  = array( self::class, 'filter_covered_license_notices' );
+			$had_filter = remove_filter( 'option_gform_sticky_admin_messages', $filter_cb );
+
+			$sticky = get_option( 'gform_sticky_admin_messages', array() );
+
+			if ( is_array( $sticky ) && ! empty( $sticky ) ) {
+				$cleaned = self::strip_covered_license_entries( $sticky, $covered );
+				if ( count( $cleaned ) !== count( $sticky ) ) {
+					update_option( 'gform_sticky_admin_messages', $cleaned );
+				}
+			}
+
+			if ( $had_filter ) {
+				add_filter( 'option_gform_sticky_admin_messages', $filter_cb );
+			}
+		}
+
+		/**
+		 * Build the set of slugs whose plugins the license currently covers.
+		 *
+		 * Reads the hub cache option directly (no Hub_Manager method calls,
+		 * no HTTP) so it is safe inside option filters and immune to
+		 * mixed-version class loading. Includes every identifier variant a
+		 * notice key may have been created under: canonical slug, legacy
+		 * download_tag and github_name.
+		 *
+		 * @since 2.1.3
+		 * @return array<string,bool> Lowercased slug => true.
+		 */
+		private static function get_covered_notice_slugs() {
+			$cache   = get_option( 'gravitywp_hub_cache', false );
+			$plugins = ( ! empty( $cache['data']['plugins'] ) && is_array( $cache['data']['plugins'] ) )
+				? $cache['data']['plugins']
+				: array();
+
+			$covered = array();
+			foreach ( $plugins as $plugin ) {
+				if ( empty( $plugin['has_access'] ) ) {
+					continue;
+				}
+				foreach ( array( 'slug', 'download_tag', 'github_name' ) as $field ) {
+					if ( ! empty( $plugin[ $field ] ) && is_string( $plugin[ $field ] ) ) {
+						$covered[ strtolower( $plugin[ $field ] ) ] = true;
+					}
+				}
+			}
+
+			return $covered;
+		}
+
+		/**
+		 * Strip covered `{slug}_license_message_notice` entries from a sticky
+		 * messages array.
+		 *
+		 * @since 2.1.3
+		 * @param array               $messages Sticky messages (key => message).
+		 * @param array<string,bool>  $covered  Lowercased covered slugs.
+		 * @return array Filtered messages.
+		 */
+		private static function strip_covered_license_entries( $messages, $covered ) {
+			$suffix_len = strlen( self::LICENSE_NOTICE_SUFFIX );
+
+			foreach ( array_keys( $messages ) as $key ) {
+				if ( ! is_string( $key ) || strlen( $key ) <= $suffix_len ) {
+					continue;
+				}
+				if ( substr( $key, -$suffix_len ) !== self::LICENSE_NOTICE_SUFFIX ) {
+					continue;
+				}
+				$slug = strtolower( substr( $key, 0, -$suffix_len ) );
+				if ( isset( $covered[ $slug ] ) ) {
+					unset( $messages[ $key ] );
+				}
+			}
+
+			return $messages;
 		}
 
 		/**

@@ -372,6 +372,17 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
 			// download_tag → canonical slug mapping and can move the keys.
 			self::normalize_plugin_keys_to_canonical( $data );
 
+			// Purge stale "license has not been activated" sticky GF notices
+			// for plugins this license now covers. Old bundled handlers left
+			// them behind in gform_sticky_admin_messages and nothing else
+			// removes them. Guarded: an older Registry class (without the
+			// method) may have won the class_exists race in mixed-version
+			// installs.
+			if ( class_exists( '\GravityWP\Shared\Global_License_Key_Registry' )
+				&& method_exists( '\GravityWP\Shared\Global_License_Key_Registry', 'cleanup_stale_license_notices' ) ) {
+				Global_License_Key_Registry::cleanup_stale_license_notices();
+			}
+
 			return $data;
 		}
 
@@ -805,17 +816,38 @@ if ( ! class_exists( '\GravityWP\Shared\Hub_Manager' ) ) {
 		/**
 		 * Get data for a specific plugin by slug.
 		 *
-		 * @param string $slug Plugin slug (download_tag).
+		 * Hub entries carry three identifiers: the canonical `slug`
+		 * (= github_name), the legacy PaddlePress `download_tag`, and
+		 * `github_name` itself. Several GF addon classes still report the
+		 * legacy download_tag as their slug (e.g. 'gravitywpapiconnector'
+		 * vs canonical 'gravitywp-api-connector'), so a canonical-only match
+		 * would miss them. Canonical `slug` matches take priority.
+		 *
+		 * @param string $slug Plugin slug (canonical, download_tag or github_name).
 		 * @return array|false Plugin data or false if not found.
 		 */
 		public static function get_plugin_data( $slug ) {
+			if ( ! is_string( $slug ) || '' === $slug ) {
+				return false;
+			}
+
 			$plugins = self::get_all_plugins();
+			$needle  = strtolower( $slug );
 
 			foreach ( $plugins as $plugin ) {
-				if ( isset( $plugin['slug'] ) && $plugin['slug'] === $slug ) {
+				if ( isset( $plugin['slug'] ) && strtolower( (string) $plugin['slug'] ) === $needle ) {
 					return $plugin;
 				}
 			}
+
+			foreach ( $plugins as $plugin ) {
+				foreach ( array( 'download_tag', 'github_name' ) as $field ) {
+					if ( ! empty( $plugin[ $field ] ) && is_string( $plugin[ $field ] ) && strtolower( $plugin[ $field ] ) === $needle ) {
+						return $plugin;
+					}
+				}
+			}
+
 			return false;
 		}
 
